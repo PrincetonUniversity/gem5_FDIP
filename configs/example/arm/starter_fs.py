@@ -140,7 +140,8 @@ def create(args):
     system.addCaches(want_caches, last_cache_level=2)
 
     # Setup gem5's minimal Linux boot loader.
-    system.realview.setupBootLoader(system, SysPaths.binary)
+    system.realview.setupBootLoader(system, SysPaths.binary, args.bootloader)
+    #system.realview.setupBootLoader(system, SysPaths.binary)
 
     if args.dtb:
         system.workload.dtb_filename = args.dtb
@@ -201,6 +202,9 @@ def main():
     parser.add_argument("--disk-image", type=str,
                         default=default_disk,
                         help="Disk to instantiate")
+    parser.add_argument("--bootloader", type=str,
+                        default="boot.arm64",
+                        help="bootloader")
     parser.add_argument("--root-device", type=str,
                         default=default_root_device,
                         help="OS device name for root partition (default: {})"
@@ -221,7 +225,7 @@ def main():
     parser.add_argument("--mem-ranks", type=int, default=None,
                         help = "number of memory ranks per channel")
     parser.add_argument("--mem-size", action="store", type=str,
-                        default="2GB",
+                        default="1GB",
                         help="Specify the physical memory size")
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument("--restore", type=str, default=None)

@@ -170,7 +170,7 @@ class GenericArmPciHost(GenericPciHost):
         # AXI memory address range
         ranges += self.pciFdtAddr(space=2, addr=0)
         ranges += state.addrCells(self.pci_mem_base)
-        ranges += local_state.sizeCells(0x40000000) # Fixed size
+        ranges += local_state.sizeCells(0x2eff0000) # Fixed size
         node.append(FdtPropertyWords("ranges", ranges))
 
         if str(self.int_policy) == 'ARM_PCI_INT_DEV':
@@ -413,9 +413,12 @@ class Pl011(Uart):
         # Hardcoded reference to the realview platform clocks, because the
         # clk_domain can only store one clock (i.e. it is not a VectorParam)
         realview = self._parent.unproxy(self)
+        #node.append(FdtPropertyWords("clocks",
+        #    [state.phandle(realview.mcc.osc_peripheral),
+        #    state.phandle(realview.dcc.osc_smb)]))
         node.append(FdtPropertyWords("clocks",
-            [state.phandle(realview.mcc.osc_peripheral),
-            state.phandle(realview.dcc.osc_smb)]))
+            [state.phandle(realview.fixed_clock24MHz),
+            state.phandle(realview.fixed_clock24MHz)]))
         node.append(FdtPropertyStrings("clock-names", ["uartclk", "apb_pclk"]))
         yield node
 
@@ -1447,3 +1450,109 @@ class VExpress_GEM5_Foundation(VExpress_GEM5_Base):
             boot_loader = [ loc('boot_v2.arm64') ]
         super(VExpress_GEM5_Foundation, self).setupBootLoader(
                 cur_sys, boot_loader)
+
+class QEMU_Virt(RealView):
+    _mem_regions = [ AddrRange('1GiB', size='1GiB') ]
+    pci_host = GenericArmPciHost(
+        conf_base=0x4010000000, conf_size='256MiB', conf_device_bits=12,
+        pci_pio_base=0x3eff0000,
+        pci_mem_base=0x10000000,
+        int_policy="ARM_PCI_INT_DEV", int_base=100, int_count=4)
+
+    vio = [
+        MmioVirtIO(pio_addr=0xa000000, pio_size=0x200,
+                   interrupt=ArmSPI(num=74,int_type='IRQ_TYPE_EDGE_RISING')),
+        MmioVirtIO(pio_addr=0xa000200, pio_size=0x200,
+                   interrupt=ArmSPI(num=75,int_type='IRQ_TYPE_EDGE_RISING')),
+    ]
+    # NOR flash, flash1
+    #flash1 = CfiMemory(range=AddrRange(0x00000000, 0x8000000),
+    #                   conf_table_reported=False)
+    uart = Pl011(pio_addr=0x9000000, interrupt=ArmSPI(num=33))
+    sys_counter = SystemCounter()
+    generic_timer = GenericTimer(
+        int_phys_s=ArmPPI(num=29, int_type='IRQ_TYPE_LEVEL_LOW'),
+        int_phys_ns=ArmPPI(num=30, int_type='IRQ_TYPE_LEVEL_LOW'),
+        int_virt=ArmPPI(num=27, int_type='IRQ_TYPE_LEVEL_LOW'),
+        int_hyp=ArmPPI(num=26, int_type='IRQ_TYPE_LEVEL_LOW'))
+
+    bootmem        = SimpleMemory(range = AddrRange('64MiB'),
+                                  conf_table_reported = False)
+    gic = Gicv3(dist_addr=0x8000000, redist_addr=0x8100000,
+                maint_int=ArmPPI(num=25), gicv4=False,
+                its=NULL)
+
+    io_voltage = VoltageDomain(voltage="3.3V")
+    fixed_clock24MHz = FixedClock(clock="24MHz")
+    _off_chip_ranges = [
+        AddrRange(0x9000000, 0x9001000),
+        AddrRange(0xa000000, 0xa000400),
+        AddrRange(0x10000000, 0x3effffff),
+        AddrRange(0x4010000000, size='256MiB')
+    ]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fixed_clock24MHz.voltage_domain = self.io_voltage
+
+    def _on_chip_devices(self):
+        devices = [
+            #self.vgic,
+            #self.local_cpu_timer,
+            #self.generic_timer,
+            self.gic
+        ]
+        if hasattr(self, "gicv2m"):
+            devices.append(self.gicv2m)
+        #devices.append(self.hdlcd)
+        return devices
+
+    def _on_chip_memory(self):
+        memories = [
+            self.bootmem,
+        ]
+        return memories
+
+    def _off_chip_devices(self):
+        devices = [
+            self.uart,
+            #self.realview_io,
+            self.vio[0],
+            self.vio[1],
+            self.pci_host,
+            self.fixed_clock24MHz
+        ]
+        # Try to attach the I/O if it exists
+        if hasattr(self, "ide"):
+            devices.append(self.ide)
+        if hasattr(self, "ethernet"):
+            devices.append(self.ethernet)
+        return devices
+
+    # Attach any PCI devices that are supported
+    def attachPciDevices(self):
+        self.ethernet = IGbE_e1000(pci_bus=0, pci_dev=0, pci_func=0,
+                                   InterruptLine=1, InterruptPin=1)
+        self.ide = IdeController(disks = [], pci_bus=0, pci_dev=1, pci_func=0,
+                                 InterruptLine=2, InterruptPin=2)
+
+    def enableMSIX(self):
+        self.gic = Gic400(dist_addr=0x2C001000, cpu_addr=0x2C002000,
+                          it_lines=512)
+        self.gicv2m = Gicv2m()
+        self.gicv2m.frames = [Gicv2mFrame(spi_base=256, spi_len=64, addr=0x2C1C0000)]
+
+    def setupBootLoader(self, cur_sys, loc, boot_loader=None):
+        if boot_loader is None:
+            boot_loader = loc('boot_emm.arm')
+        super().setupBootLoader(
+                cur_sys, boot_loader, 0x8000000, 0x40000000)
+
+    def attachPciDevice(self, device, *args, **kwargs):
+        device.host = self.pci_host
+        self._num_pci_dev += 1
+        device.pci_bus = 0
+        device.pci_dev = self._num_pci_dev
+        device.pci_func = 0
+        self._attach_device(device, *args, **kwargs)
+

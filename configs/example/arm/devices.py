@@ -289,7 +289,8 @@ class BaseSimpleSystem(ArmSystem):
             voltage_domain=Parent.voltage_domain)
 
         if platform is None:
-            self.realview = VExpress_GEM5_V1()
+            #self.realview = VExpress_GEM5_V1()
+            self.realview = QEMU_Virt()
         else:
             self.realview = platform
 
@@ -315,6 +316,7 @@ class BaseSimpleSystem(ArmSystem):
         the entire user's memory requirements.
         """
         mem_ranges = []
+        print(self.realview._mem_regions)
         for mem_range in self.realview._mem_regions:
             size_in_range = min(mem_size, mem_range.size())
 
