@@ -1478,7 +1478,7 @@ class QEMU_Virt(RealView):
 
     bootmem        = SimpleMemory(range = AddrRange('64MiB'),
                                   conf_table_reported = False)
-    gic = Gicv3(dist_addr=0x8000000, redist_addr=0x8100000,
+    gic = Gicv3(dist_addr=0x8000000, redist_addr=0x8010000,
                 maint_int=ArmPPI(num=25), gicv4=False,
                 its=NULL)
 
