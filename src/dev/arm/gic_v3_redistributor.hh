@@ -83,6 +83,8 @@ class Gicv3Redistributor : public Serializable
         GICR_IIDR  = RD_base + 0x0004,
         // Type Register
         GICR_TYPER = RD_base + 0x0008,
+        // Usr
+        GICR_STATUSR = RD_base + 0x0010,
         // Wake Register
         GICR_WAKER = RD_base + 0x0014,
         // Peripheral ID0 Register

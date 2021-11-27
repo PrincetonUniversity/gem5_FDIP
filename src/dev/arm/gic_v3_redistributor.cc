@@ -169,7 +169,33 @@ Gicv3Redistributor::read(Addr addr, size_t size, bool is_secure_access)
           return (affinity << 32) | (1 << 24) | (cpuId << 8) |
               (1 << 5) | (last << 4) | (1 << 3) | (1 << 0);
       }
-
+      case GICR_TYPER + 4 : { // Type Register
+          /*
+           * Affinity_Value   [63:32] == X
+           * (The identity of the PE associated with this Redistributor)
+           * CommonLPIAff     [25:24] == 01
+           * (All Redistributors with the same Aff3 value must share an
+           * LPI Configuration table)
+           * Processor_Number [23:8]  == X
+           * (A unique identifier for the PE)
+           * DPGS             [5]     == 1
+           * (GICR_CTLR.DPG* bits are supported)
+           * Last             [4]     == X
+           * (This Redistributor is the highest-numbered Redistributor in
+           * a series of contiguous Redistributor pages)
+           * DirectLPI        [3]     == 1
+           * (direct injection of LPIs supported)
+           * VLPIS            [1]     == 0
+           * (virtual LPIs not supported)
+           * PLPIS            [0]     == 1
+           * (physical LPIs supported)
+           */
+          uint64_t affinity = getAffinity();
+          int last = cpuId == (gic->getSystem()->threads.size() - 1);
+          return (affinity);
+      }
+      case GICR_STATUSR:
+        return 0;
       case GICR_WAKER: // Wake Register
         if (!distributor->DS && !is_secure_access) {
             // RAZ/WI for non-secure accesses
@@ -422,6 +448,8 @@ Gicv3Redistributor::write(Addr addr, uint64_t data, size_t size,
           DPG0 = data & GICR_CTLR_DPG0;
           break;
       }
+      case GICR_STATUSR:
+        return;
 
       case GICR_WAKER: // Wake Register
       {
