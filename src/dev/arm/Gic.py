@@ -240,7 +240,7 @@ class Gicv3Its(BasicPioDevice):
     cxx_class = 'gem5::Gicv3Its'
 
     dma = RequestPort("DMA port")
-    pio_size = Param.Unsigned(0x20000, "Gicv3Its pio size")
+    pio_size = Param.Unsigned(0x9ffff, "Gicv3Its pio size")
 
     # CIL [36] = 0: ITS supports 16-bit CollectionID
     # Devbits [17:13] = 0b100011: ITS supports 23 DeviceID bits
@@ -316,7 +316,7 @@ class Gicv3(BaseGic):
             state.addrCells(self.dist_addr) +
             state.sizeCells(0x10000) +
             state.addrCells(self.redist_addr) +
-            state.sizeCells(0x2000000) )
+            state.sizeCells(0xf60000) )
 
         node.append(FdtPropertyWords("reg", regs))
         node.append(FdtPropertyWords("interrupts",

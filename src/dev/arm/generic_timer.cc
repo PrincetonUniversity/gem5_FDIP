@@ -380,6 +380,7 @@ ArchTimer::unserialize(CheckpointIn &cp)
     // We didn't serialize an offset before we added support for the
     // virtual timer. Consider it optional to maintain backwards
     // compatibility.
+    UNSERIALIZE_SCALAR(_counterLimit);
     if (!UNSERIALIZE_OPT_SCALAR(_offset))
         _offset = 0;
 

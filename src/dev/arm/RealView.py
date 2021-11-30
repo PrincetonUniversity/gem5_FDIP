@@ -1471,16 +1471,17 @@ class QEMU_Virt(RealView):
     uart = Pl011(pio_addr=0x9000000, interrupt=ArmSPI(num=33))
     sys_counter = SystemCounter()
     generic_timer = GenericTimer(
-        int_phys_s=ArmPPI(num=29, int_type='IRQ_TYPE_LEVEL_LOW'),
-        int_phys_ns=ArmPPI(num=30, int_type='IRQ_TYPE_LEVEL_LOW'),
-        int_virt=ArmPPI(num=27, int_type='IRQ_TYPE_LEVEL_LOW'),
-        int_hyp=ArmPPI(num=26, int_type='IRQ_TYPE_LEVEL_LOW'))
+        int_phys_s=ArmPPI(num=29, int_type='IRQ_TYPE_LEVEL_HIGH'),
+        int_phys_ns=ArmPPI(num=30, int_type='IRQ_TYPE_LEVEL_HIGH'),
+        int_virt=ArmPPI(num=27, int_type='IRQ_TYPE_LEVEL_HIGH'),
+        int_hyp=ArmPPI(num=26, int_type='IRQ_TYPE_LEVEL_HIGH'))
 
     bootmem        = SimpleMemory(range = AddrRange('64MiB'),
                                   conf_table_reported = False)
-    gic = Gicv3(dist_addr=0x8000000, redist_addr=0x8010000,
+    gic = Gicv3(dist_addr=0x8000000, redist_addr=0x80a0000,
                 maint_int=ArmPPI(num=25), gicv4=False,
                 its=NULL)
+                #its=Gicv3Its(pio_addr=0x8080000))
 
     io_voltage = VoltageDomain(voltage="3.3V")
     fixed_clock24MHz = FixedClock(clock="24MHz")
@@ -1500,6 +1501,7 @@ class QEMU_Virt(RealView):
             #self.vgic,
             #self.local_cpu_timer,
             #self.generic_timer,
+            #self.gic.its,
             self.gic
         ]
         if hasattr(self, "gicv2m"):

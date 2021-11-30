@@ -798,7 +798,8 @@ TLB::checkPermissions64(TlbEntry *te, const RequestPtr &req,
     // Generate an alignment fault for unaligned accesses to device or
     // strongly ordered memory
     if (!is_fetch) {
-        if (te->mtype != TlbEntry::MemoryType::Normal) {
+        if ( (te->mtype != TlbEntry::MemoryType::Normal &&
+                    te->mtype != TlbEntry::MemoryType::Device)) {
             if (vaddr & mask(flags & AlignmentMask)) {
                 stats.alignFaults++;
                 return std::make_shared<DataAbort>(
@@ -1133,8 +1134,10 @@ TLB::translateMmuOn(ThreadContext* tc, const RequestPtr &req,
         // Require requests to be ordered if the request goes to
         // strongly ordered or device memory (i.e., anything other
         // than normal memory requires strict order).
-        if (te->mtype != TlbEntry::MemoryType::Normal)
+        if (te->mtype != TlbEntry::MemoryType::Normal
+                && te->mtype != TlbEntry::MemoryType::Device){
             req->setFlags(Request::STRICT_ORDER);
+        }
 
         Addr pa = te->pAddr(vaddr);
         req->setPaddr(pa);
@@ -1144,7 +1147,8 @@ TLB::translateMmuOn(ThreadContext* tc, const RequestPtr &req,
         }
         if (!is_fetch && fault == NoFault &&
             (vaddr & mask(flags & AlignmentMask)) &&
-            (te->mtype != TlbEntry::MemoryType::Normal)) {
+            (te->mtype != TlbEntry::MemoryType::Normal && 
+             te->mtype != TlbEntry::MemoryType::Device)) {
                 // Unaligned accesses to Device memory should always cause an
                 // abort regardless of sctlr.a
                 stats.alignFaults++;
