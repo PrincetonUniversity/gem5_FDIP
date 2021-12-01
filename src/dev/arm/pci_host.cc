@@ -62,6 +62,10 @@ GenericArmPciHost::mapPciInterrupt(const PciBusAddr &addr, PciIntPin pin) const
         return GenericPciHost::mapPciInterrupt(addr, pin);
 
       case enums::ARM_PCI_INT_DEV:
+        if(addr.dev == 2 || addr.dev == 1){
+          warn("Accessing disk\n");
+          return 38;
+        }
         return intBase + (addr.dev % intCount);
 
       case enums::ARM_PCI_INT_PIN:

@@ -179,19 +179,28 @@ class GenericArmPciHost(GenericPciHost):
             # Interrupt mapping
             interrupts = []
 
-            # child interrupt specifier
-            child_interrupt = local_state.interruptCells(0x0)
 
             # parent unit address
             parent_addr = gic._state.addrCells(0x0)
 
-            for i in range(int(self.int_count)):
-                parent_interrupt = gic.interruptCells(0,
-                    int(self.int_base) - 32 + i, 1)
+            num_slots = 4
+            child_to_parent_intmap = {
+                1:6,
+                2:3,
+                3:4,
+                4:5
+            }
+            for slot in range(num_slots):
+                for i in range(int(self.int_count)):
+                    parent_interrupt = gic.interruptCells(0,
+                        child_to_parent_intmap[i+1], 4)
 
-                interrupts += self.pciFdtAddr(device=i, addr=0) + \
-                    child_interrupt + [int_phandle] + parent_addr + \
-                    parent_interrupt
+                    # child interrupt specifier
+                    child_interrupt = local_state.interruptCells(i+1)
+
+                    interrupts += self.pciFdtAddr(device=(slot), addr=0) + \
+                        child_interrupt + [int_phandle] + parent_addr + \
+                        parent_interrupt
 
             node.append(FdtPropertyWords("interrupt-map", interrupts))
 
@@ -199,7 +208,7 @@ class GenericArmPciHost(GenericPciHost):
             if int_count & (int_count - 1):
                 fatal("PCI interrupt count should be power of 2")
 
-            intmask = self.pciFdtAddr(device=int_count - 1, addr=0) + [0x0]
+            intmask = self.pciFdtAddr(device=int_count - 1, addr=0) + [0x7]
             node.append(FdtPropertyWords("interrupt-map-mask", intmask))
         else:
             m5.fatal("Unsupported PCI interrupt policy " +
@@ -1236,7 +1245,7 @@ Interrupts:
         device.host = self.pci_host
         self._num_pci_dev += 1
         device.pci_bus = 0
-        device.pci_dev = self._num_pci_dev
+        device.pci_dev = (self._num_pci_dev)
         device.pci_func = 0
         self._attach_device(device, *args, **kwargs)
 
@@ -1457,7 +1466,7 @@ class QEMU_Virt(RealView):
         conf_base=0x4010000000, conf_size='256MiB', conf_device_bits=12,
         pci_pio_base=0x3eff0000,
         pci_mem_base=0x10000000,
-        int_policy="ARM_PCI_INT_DEV", int_base=100, int_count=4)
+        int_policy="ARM_PCI_INT_DEV", int_base=35, int_count=4)
 
     vio = [
         MmioVirtIO(pio_addr=0xa000000, pio_size=0x200,
@@ -1526,13 +1535,16 @@ class QEMU_Virt(RealView):
         ]
         # Try to attach the I/O if it exists
         if hasattr(self, "ide"):
+            print("Attaching IDE")
             devices.append(self.ide)
         if hasattr(self, "ethernet"):
+            print("Attaching Ethernet")
             devices.append(self.ethernet)
         return devices
 
     # Attach any PCI devices that are supported
     def attachPciDevices(self):
+        print("Attaching all PCI Devices")
         self.ethernet = IGbE_e1000(pci_bus=0, pci_dev=0, pci_func=0,
                                    InterruptLine=1, InterruptPin=1)
         self.ide = IdeController(disks = [], pci_bus=0, pci_dev=1, pci_func=0,
@@ -1552,7 +1564,7 @@ class QEMU_Virt(RealView):
 
     def attachPciDevice(self, device, *args, **kwargs):
         device.host = self.pci_host
-        self._num_pci_dev += 1
+        self._num_pci_dev += 2
         device.pci_bus = 0
         device.pci_dev = self._num_pci_dev
         device.pci_func = 0
