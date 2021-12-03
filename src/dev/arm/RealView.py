@@ -171,6 +171,10 @@ class GenericArmPciHost(GenericPciHost):
         ranges += self.pciFdtAddr(space=2, addr=0)
         ranges += state.addrCells(self.pci_mem_base)
         ranges += local_state.sizeCells(0x2eff0000) # Fixed size
+
+        ranges += self.pciFdtAddr(space=3, addr=0x8000000000)
+        ranges += state.addrCells(self.pci_dma_base)
+        ranges += local_state.sizeCells(0x8000000000) # Fixed size
         node.append(FdtPropertyWords("ranges", ranges))
 
         if str(self.int_policy) == 'ARM_PCI_INT_DEV':
@@ -1466,13 +1470,14 @@ class QEMU_Virt(RealView):
         conf_base=0x4010000000, conf_size='256MiB', conf_device_bits=12,
         pci_pio_base=0x3eff0000,
         pci_mem_base=0x10000000,
+        pci_dma_base=0x8000000000,
         int_policy="ARM_PCI_INT_DEV", int_base=35, int_count=4)
 
     vio = [
-        MmioVirtIO(pio_addr=0xa000000, pio_size=0x200,
-                   interrupt=ArmSPI(num=74,int_type='IRQ_TYPE_EDGE_RISING')),
-        MmioVirtIO(pio_addr=0xa000200, pio_size=0x200,
-                   interrupt=ArmSPI(num=75,int_type='IRQ_TYPE_EDGE_RISING')),
+        MmioVirtIO(pio_addr=0xa003e00, pio_size=0x200,
+                   interrupt=ArmSPI(num=79,int_type='IRQ_TYPE_EDGE_RISING')),
+        #MmioVirtIO(pio_addr=0xa000200, pio_size=0x200,
+        #           interrupt=ArmSPI(num=75,int_type='IRQ_TYPE_EDGE_RISING')),
     ]
     # NOR flash, flash1
     #flash1 = CfiMemory(range=AddrRange(0x00000000, 0x8000000),
@@ -1496,9 +1501,10 @@ class QEMU_Virt(RealView):
     fixed_clock24MHz = FixedClock(clock="24MHz")
     _off_chip_ranges = [
         AddrRange(0x9000000, 0x9001000),
-        AddrRange(0xa000000, 0xa000400),
+        AddrRange(0xa003e00, 0xa003fff),
         AddrRange(0x10000000, 0x3effffff),
-        AddrRange(0x4010000000, size='256MiB')
+        AddrRange(0x4010000000, size='256MiB'),
+        AddrRange(0x8000000000, size='512GiB')
     ]
 
     def __init__(self, **kwargs):
@@ -1528,11 +1534,11 @@ class QEMU_Virt(RealView):
         devices = [
             self.uart,
             #self.realview_io,
-            self.vio[0],
-            self.vio[1],
+            #self.vio[0],
+            #self.vio[1],
             self.pci_host,
             self.fixed_clock24MHz
-        ]
+        ] + self.vio
         # Try to attach the I/O if it exists
         if hasattr(self, "ide"):
             print("Attaching IDE")
