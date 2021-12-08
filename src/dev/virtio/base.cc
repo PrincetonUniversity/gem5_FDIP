@@ -288,6 +288,7 @@ VirtQueue::consumeDescriptor()
     DPRINTF(VIO, "consumeDescriptor: _last_avail: %i, avail.idx: %i (->%i)\n",
             _last_avail, avail.header.index,
             avail.ring[_last_avail % used.ring.size()]);
+
     if (_last_avail == avail.header.index)
         return NULL;
 

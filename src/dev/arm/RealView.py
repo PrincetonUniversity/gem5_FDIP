@@ -1475,7 +1475,7 @@ class QEMU_Virt(RealView):
 
     vio = [
         MmioVirtIO(pio_addr=0xa003e00, pio_size=0x200,
-                   interrupt=ArmSPI(num=79,int_type='IRQ_TYPE_EDGE_RISING')),
+                   interrupt=ArmSPI(num=79,int_type='IRQ_TYPE_LEVEL_HIGH')),
         #MmioVirtIO(pio_addr=0xa000200, pio_size=0x200,
         #           interrupt=ArmSPI(num=75,int_type='IRQ_TYPE_EDGE_RISING')),
     ]

@@ -44,6 +44,6 @@ class VirtIOBlock(VirtIODeviceBase):
     cxx_header = 'dev/virtio/block.hh'
     cxx_class = 'gem5::VirtIOBlock'
 
-    queueSize = Param.Unsigned(256, "Output queue size (pages)")
+    queueSize = Param.Unsigned(1024, "Output queue size (pages)")
 
     image = Param.DiskImage("Disk image")
