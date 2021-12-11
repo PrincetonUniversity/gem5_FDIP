@@ -901,6 +901,31 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     return predict_taken;
 }
 
+void
+Fetch::profileMispredict(const DynInstPtr &inst, bool taken)
+{
+    /*if (taken)
+        mispredictedCFIAsFTActuallyTaken++;
+    else
+        mispredictedCFIAsTakenActuallyFT++;
+
+    if(inst->isDirectCtrl() && !inst->isCall() && !inst->isReturn())
+        mispredictedDirectBranches++;
+
+    else if(inst->isIndirectCtrl() && !inst->isCall() && !inst->isReturn())
+         mispredictedIndirectBranches++;
+
+    else if(inst->isDirectCtrl() && inst->isCall())
+        mispredictedDirectCalls++;
+
+    else if(inst->isIndirectCtrl() && inst->isCall())
+        mispredictedIndirectCalls++;
+  
+    else if(inst->isReturn())
+        mispredictedReturns++;*/
+
+}
+
 bool
 Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
 {

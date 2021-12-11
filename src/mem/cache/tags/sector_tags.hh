@@ -165,6 +165,8 @@ class SectorTags : public BaseTags
      */
     CacheBlk* findBlock(Addr addr, bool is_secure) const override;
 
+    CacheBlk* starveMRU(Addr addr, bool is_secure) override { return nullptr; }
+    
     /**
      * Find replacement victim based on address.
      *
