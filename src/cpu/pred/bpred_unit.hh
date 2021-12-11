@@ -79,6 +79,16 @@ class BPredUnit : public SimObject
     /** Perform sanity checks after a drain. */
     void drainSanityCheck() const;
 
+    StaticInstPtr getBranch(Addr bbladdr, ThreadID tid);
+    TheISA::PCState getBranchPC(Addr bbladdr, ThreadID tid);
+    StaticInstPtr getBranchFromIndex(unsigned idx, ThreadID tid);
+    TheISA::PCState getBranchPCFromIndex(unsigned idx, ThreadID tid);
+    int getBblIndex(Addr instPC, ThreadID tid);
+    uint64_t getBblSize(Addr bbladdr, ThreadID tid);
+    bool getBblValid(Addr bbladdr, ThreadID tid);
+    TheISA::PCState getTaken(Addr bbladdr, ThreadID tid);
+    TheISA::PCState getFT(Addr bbladdr, ThreadID tid);
+
     /**
      * Predicts whether or not the instruction is a taken branch, and the
      * target of the branch if it is taken.
@@ -89,6 +99,10 @@ class BPredUnit : public SimObject
      */
     bool predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                  TheISA::PCState &pc, ThreadID tid);
+
+    // Nayana added
+    bool predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
+                 Addr bbladdr, TheISA::PCState &pc, ThreadID tid);
 
     // @todo: Rename this function.
     virtual void uncondBranch(ThreadID tid, Addr pc, void * &bp_history) = 0;
@@ -120,6 +134,16 @@ class BPredUnit : public SimObject
      */
     void squash(const InstSeqNum &squashed_sn,
                 const TheISA::PCState &corr_target,
+                bool actually_taken, ThreadID tid);
+
+    // Nayana added
+    void squash(const InstSeqNum &squashed_sn,
+                const Addr bblAddr,
+                const StaticInstPtr &branchInst,
+                const TheISA::PCState &branchPC,
+                const uint64_t bblSize,
+                const TheISA::PCState &corr_target,
+                const TheISA::PCState &corr_ft,
                 bool actually_taken, ThreadID tid);
 
     /**
@@ -178,17 +202,24 @@ class BPredUnit : public SimObject
      */
     virtual void update(ThreadID tid, Addr instPC, bool taken,
                    void *bp_history, bool squashed,
-                   const StaticInstPtr &inst, Addr corrTarget) = 0;
+                   const StaticInstPtr & inst = StaticInst::nullStaticInstPtr,
+                   Addr corrTarget = MaxAddr) = 0;
     /**
      * Updates the BTB with the target of a branch.
      * @param inst_PC The branch's PC that will be updated.
      * @param target_PC The branch's target that will be added to the BTB.
      */
-    void BTBUpdate(Addr instPC, const TheISA::PCState &target)
-    { BTB.update(instPC, target, 0); }
+
+    void BTBUpdate(Addr instPC, const StaticInstPtr &staticBranchInst, 
+                const TheISA::PCState &branch,
+                const uint64_t bblSize, const TheISA::PCState &target, 
+                const TheISA::PCState &ft, bool uncond, ThreadID tid)
+    { BTB.update(instPC, staticBranchInst, branch, bblSize, target, ft, uncond, tid); }
 
 
     void dump();
+    
+    bool isBTBMiss(const InstSeqNum seq_num, ThreadID tid);
 
   private:
     struct PredictorHistory
@@ -206,6 +237,19 @@ class BPredUnit : public SimObject
               tid(_tid), predTaken(pred_taken), usedRAS(0), pushedRAS(0),
               wasCall(0), wasReturn(0), wasIndirect(0), target(MaxAddr),
               inst(inst)
+        {}
+
+        // Nayana added
+        PredictorHistory(const InstSeqNum &seq_num, Addr instPC,
+                         bool pred_taken, void *bp_history,
+                         void *indirect_history, ThreadID _tid,
+                         const StaticInstPtr & inst,
+                         Addr bbladdr)
+            : seqNum(seq_num), pc(instPC), bpHistory(bp_history),
+              indirectHistory(indirect_history), RASTarget(0), RASIndex(0),
+              tid(_tid), predTaken(pred_taken), usedRAS(0), pushedRAS(0),
+              wasCall(0), wasReturn(0), wasIndirect(0), wasBTBMiss(0), 
+              target(MaxAddr), inst(inst), bbladdr(bbladdr)
         {}
 
         bool operator==(const PredictorHistory &entry) const {
@@ -253,6 +297,8 @@ class BPredUnit : public SimObject
         /** Wether this instruction was an indirect branch */
         bool wasIndirect;
 
+        bool wasBTBMiss;
+
         /** Target of the branch. First it is predicted, and fixed later
          *  if necessary
          */
@@ -260,6 +306,7 @@ class BPredUnit : public SimObject
 
         /** The branch instrction */
         const StaticInstPtr inst;
+        Addr bbladdr;
     };
 
     typedef std::deque<PredictorHistory> History;
@@ -284,6 +331,10 @@ class BPredUnit : public SimObject
     /** The indirect target predictor. */
     IndirectPredictor * iPred;
 
+  public:
+    PredictorHistory *prev_hist;
+
+  private:
     struct BPredUnitStats : public statistics::Group
     {
         BPredUnitStats(statistics::Group *parent);

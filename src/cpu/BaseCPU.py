@@ -170,6 +170,19 @@ class BaseCPU(ClockedObject):
 
     tracer = Param.InstTracer(default_tracer, "Instruction tracer")
 
+    # EMISSARY: BEGIN
+    totalSimInsts = Param.Unsigned(105000000, "Total Instructions to simulate (including warmup instructions)")
+    starveRandomness = Param.Float(50, "StarveRandomness")
+    starveAtleast = Param.Unsigned(0, "StarveAtleast")
+    randomStarve = Param.Bool(False, "RandomStarve")
+    # oracle cms11
+    cache_repl = Param.Unsigned(3, "Cache Replacement Policy")
+    numSets = Param.Unsigned(64, "Num of Icacahe Sets")
+    pureRandom = Param.Bool(False, "PureRandom")
+    ftqSize = Param.Unsigned(5, "Fetch target queue size")
+    emissaryEnableIQEmpty = Param.Bool(False, "EMISSARY Set starvation bit only IQ is empty")
+    # EMISSARY: END
+
     icache_port = RequestPort("Instruction Port")
     dcache_port = RequestPort("Data Port")
     _cached_ports = ['icache_port', 'dcache_port']

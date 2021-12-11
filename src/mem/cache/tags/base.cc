@@ -150,6 +150,7 @@ BaseTags::cleanupRefsVisitor(CacheBlk &blk)
 {
     if (blk.isValid()) {
         stats.totalRefs += blk.getRefCount();
+        stats.totalStarves += blk.isStarved();
         ++stats.sampledRefs;
     }
 }
@@ -224,11 +225,16 @@ BaseTags::BaseTagStats::BaseTagStats(BaseTags &_tags)
              "Average ticks per tags in use"),
     ADD_STAT(totalRefs, statistics::units::Count::get(),
              "Total number of references to valid blocks."),
+    ADD_STAT(totalStarves, statistics::units::Count::get(),
+              "Total number of starvations to valid blocks."),
     ADD_STAT(sampledRefs, statistics::units::Count::get(),
              "Sample count of references to valid blocks."),
     ADD_STAT(avgRefs, statistics::units::Rate<
                 statistics::units::Count, statistics::units::Count>::get(),
              "Average number of references to valid blocks."),
+    ADD_STAT(avgStarves, statistics::units::Rate<
+                statistics::units::Count, statistics::units::Count>::get(),
+            "Average number of starvations to valid blocks."),
     ADD_STAT(warmupTick, statistics::units::Tick::get(),
              "The tick when the warmup percentage was hit."),
     ADD_STAT(occupancies, statistics::units::Rate<
@@ -260,6 +266,7 @@ BaseTags::BaseTagStats::regStats()
     System *system = tags.system;
 
     avgRefs = totalRefs / sampledRefs;
+    avgStarves = totalStarves / sampledRefs;
 
     occupancies
         .init(system->maxRequestors())

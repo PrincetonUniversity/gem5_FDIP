@@ -43,6 +43,7 @@
 #include "base/trace.hh"
 #include "debug/Fetch.hh"
 #include "debug/LTage.hh"
+#include "debug/Tage.hh"
 
 namespace gem5
 {
@@ -65,6 +66,7 @@ LTAGE::init()
 bool
 LTAGE::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
 {
+    DPRINTF(Tage, "Bgodala LTAGE\n");
     LTageBranchInfo *bi = new LTageBranchInfo(*tage, *loopPredictor);
     b = (void*)(bi);
 
@@ -100,6 +102,7 @@ LTAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
     assert(bp_history);
 
     LTageBranchInfo* bi = static_cast<LTageBranchInfo*>(bp_history);
+    TAGEBase::BranchInfo *tage_bi = bi->tageBranchInfo;
 
     if (squashed) {
         if (tage->isSpeculativeUpdateEnabled()) {
@@ -114,6 +117,8 @@ LTAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
         return;
     }
 
+
+    tage_bi->isUpdated = true;
     int nrand = random_mt.random<int>() & 3;
     if (bi->tageBranchInfo->condBranch) {
         DPRINTF(LTage, "Updating tables for branch:%lx; taken?:%d\n",

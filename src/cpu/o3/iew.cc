@@ -461,6 +461,7 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
             inst->seqNum < toCommit->squashedSeqNum[tid]) {
         toCommit->squash[tid] = true;
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedBrSeqNum[tid] = inst->brSeqNum;
         toCommit->branchTaken[tid] = inst->pcState().branching();
 
         TheISA::PCState pc = inst->pcState();
@@ -468,6 +469,7 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
 
         toCommit->pc[tid] = pc;
         toCommit->mispredictInst[tid] = inst;
+        inst->mispred = 'T';
         toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
@@ -491,6 +493,7 @@ IEW::squashDueToMemOrder(const DynInstPtr& inst, ThreadID tid)
         toCommit->squash[tid] = true;
 
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedBrSeqNum[tid] = inst->brSeqNum;
         toCommit->pc[tid] = inst->pcState();
         toCommit->mispredictInst[tid] = NULL;
 
@@ -1297,6 +1300,7 @@ IEW::executeInsts()
             bool loadNotExecuted = !inst->isExecuted() && inst->isLoad();
 
             if (inst->mispredicted() && !loadNotExecuted) {
+                inst->mispred = 'T';
                 fetchRedirect[tid] = true;
 
                 DPRINTF(IEW, "[tid:%i] [sn:%llu] Execute: "
@@ -1599,6 +1603,7 @@ IEW::checkMisprediction(const DynInstPtr& inst)
         toCommit->squashedSeqNum[tid] > inst->seqNum) {
 
         if (inst->mispredicted()) {
+            inst->mispred = 'T';
             fetchRedirect[tid] = true;
 
             DPRINTF(IEW, "[tid:%i] [sn:%llu] Execute: "

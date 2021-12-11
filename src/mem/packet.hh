@@ -382,6 +382,13 @@ class Packet : public Printable
     /// True if the request targets the secure memory space.
     bool _isSecure;
 
+    // EMISSARY: BEGIN
+    // True if this memory address caused decode to stall
+    bool _isStarved;
+    bool _isPreserve;
+    bool _isSBIP;
+    // EMISSARY: END
+
     /// The size of the request or transfer.
     unsigned size;
 
@@ -409,6 +416,15 @@ class Packet : public Printable
     uint64_t htmTransactionUid;
 
   public:
+
+    //EMISSARY: BEGIN
+    Tick tickBlkInserted;
+    Tick tickBlkRecentAccess;
+    int accessCount;
+    int starveCount;
+    bool evictFromL1;
+    uint8_t starveHistory;
+    //EMISSARY: END
 
     /**
      * The extra delay from seeing the packet until the header is
@@ -813,6 +829,20 @@ class Packet : public Printable
         return _isSecure;
     }
 
+    //EMISSARY: BEGIN
+    bool isStarved() const
+    {
+        assert(flags.isSet(VALID_ADDR));
+        return _isStarved;
+    }
+
+    bool isPreserve() const
+    {
+        assert(flags.isSet(VALID_ADDR));
+        return _isPreserve;
+    }
+    //EMISSARY: END
+
     /**
      * Accessor function to atomic op.
      */
@@ -850,10 +880,11 @@ class Packet : public Printable
      */
     Packet(const RequestPtr &_req, MemCmd _cmd)
         :  cmd(_cmd), id((PacketId)_req.get()), req(_req),
-           data(nullptr), addr(0), _isSecure(false), size(0),
+           data(nullptr), addr(0), _isSecure(false), _isStarved(false), _isPreserve(false), size(0),
            _qosValue(0),
            htmReturnReason(HtmCacheFailure::NO_FAIL),
            htmTransactionUid(0),
+           starveCount(0), evictFromL1(false), starveHistory(0),
            headerDelay(0), snoopDelay(0),
            payloadDelay(0), senderState(NULL)
     {
@@ -891,10 +922,11 @@ class Packet : public Printable
      */
     Packet(const RequestPtr &_req, MemCmd _cmd, int _blkSize, PacketId _id = 0)
         :  cmd(_cmd), id(_id ? _id : (PacketId)_req.get()), req(_req),
-           data(nullptr), addr(0), _isSecure(false),
+           data(nullptr), addr(0), _isSecure(false), _isStarved(false), _isPreserve(false),
            _qosValue(0),
            htmReturnReason(HtmCacheFailure::NO_FAIL),
            htmTransactionUid(0),
+           starveCount(0), evictFromL1(false), starveHistory(0),
            headerDelay(0),
            snoopDelay(0), payloadDelay(0), senderState(NULL)
     {
@@ -918,11 +950,12 @@ class Packet : public Printable
     Packet(const PacketPtr pkt, bool clear_flags, bool alloc_data)
         :  cmd(pkt->cmd), id(pkt->id), req(pkt->req),
            data(nullptr),
-           addr(pkt->addr), _isSecure(pkt->_isSecure), size(pkt->size),
+           addr(pkt->addr), _isSecure(pkt->_isSecure), _isStarved(false), _isPreserve(false), size(pkt->size),
            bytesValid(pkt->bytesValid),
            _qosValue(pkt->qosValue()),
            htmReturnReason(HtmCacheFailure::NO_FAIL),
            htmTransactionUid(0),
+           starveCount(0), evictFromL1(false), starveHistory(0),
            headerDelay(pkt->headerDelay),
            snoopDelay(0),
            payloadDelay(pkt->payloadDelay),
@@ -1071,6 +1104,20 @@ class Packet : public Printable
         this->size = size;
         flags.set(VALID_SIZE);
     }
+
+    //EMISSARY: BEGIN
+    void
+    setStarved(bool isStarved)
+    {
+        this->_isStarved = isStarved;
+    }
+
+    void
+    setPreserve(bool isPreserve)
+    {
+        this->_isPreserve = isPreserve;
+    }
+    //EMISSARY: END
 
     /**
      * Check if packet corresponds to a given block-aligned address and

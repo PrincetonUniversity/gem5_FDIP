@@ -58,6 +58,8 @@
 #include "sim/eventq.hh"
 #include "sim/probe/probe.hh"
 
+using namespace std;
+
 namespace gem5
 {
 
@@ -67,6 +69,12 @@ namespace o3
 {
 
 class CPU;
+
+#define FTQ_MAX_SIZE 10
+/** Nayana: FDIP based Fetch Target Queue. */
+extern std::deque<TheISA::PCState> prefetchQueue[FTQ_MAX_SIZE];
+extern std::deque<InstSeqNum> prefetchQueueSeqNum[FTQ_MAX_SIZE];
+extern std::deque<TheISA::PCState> prefetchQueueBr[FTQ_MAX_SIZE];
 
 /**
  * Fetch class handles both single threaded and SMT fetch. Its
@@ -184,6 +192,10 @@ class Fetch
     };
 
   private:
+
+    InstSeqNum seq[MaxThreads];
+    InstSeqNum brseq[MaxThreads];
+
     /** Fetch status. */
     FetchStatus _status;
 
@@ -342,6 +354,8 @@ class Fetch
      */
     bool checkSignalsAndUpdate(ThreadID tid);
 
+    TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid);
+    void addToFTQ();
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
      * @param status_change fetch() sets this variable if there was a status
@@ -387,6 +401,9 @@ class Fetch
     /** Profile the reasons of fetch stall. */
     void profileStall(ThreadID tid);
 
+    /** Profile the reasons of mispredict. */
+    void profileMispredict(const DynInstPtr &inst, bool taken);
+
   private:
     /** Pointer to the O3CPU. */
     CPU *cpu;
@@ -414,16 +431,23 @@ class Fetch
     branch_prediction::BPredUnit *branchPred;
 
     TheISA::PCState pc[MaxThreads];
+    DynInstPtr lastinst[MaxThreads];
 
     Addr fetchOffset[MaxThreads];
 
     StaticInstPtr macroop[MaxThreads];
 
+    TheISA::PCState prefPC[MaxThreads];
+    Addr bblAddr[MaxThreads];
+    uint64_t bblSize[MaxThreads];
+
     /** Can the fetch stage redirect from an interrupt on this instruction? */
     bool delayedCommit[MaxThreads];
 
+    typedef typename std::list<RequestPtr>::iterator memReqListIt;
     /** Memory request used to access cache. */
-    RequestPtr memReq[MaxThreads];
+    //RequestPtr memReq[MaxThreads];
+    std::list<RequestPtr> memReq[MaxThreads];
 
     /** Variable that tracks if fetch has written to the time buffer this
      * cycle. Used to tell CPU if there is activity this cycle.
@@ -481,11 +505,17 @@ class Fetch
     /** Mask to align a fetch address to a fetch buffer boundary. */
     Addr fetchBufferMask;
 
+    typedef typename std::list<uint8_t*>::iterator bufIt;
+    typedef typename std::list<Addr>::iterator pcIt;
+    typedef typename std::list<bool>::iterator validIt;
     /** The fetch data that is being fetched and buffered. */
-    uint8_t *fetchBuffer[MaxThreads];
+    //uint8_t *fetchBuffer[MaxThreads];
+    std::list<uint8_t*> fetchBuffer[MaxThreads];
 
     /** The PC of the first instruction loaded into the fetch buffer. */
-    Addr fetchBufferPC[MaxThreads];
+    //Addr fetchBufferPC[MaxThreads];
+    std::list<Addr> fetchBufferPC[MaxThreads];
+    bool add_front;
 
     /** The size of the fetch queue in micro-ops */
     unsigned fetchQueueSize;
@@ -493,8 +523,13 @@ class Fetch
     /** Queue of fetched instructions. Per-thread to prevent HoL blocking. */
     std::deque<DynInstPtr> fetchQueue[MaxThreads];
 
+    /** Queue of to prefetch instructions. Per-thread to prevent HoL blocking. */
+    unsigned prefetchQueueSize;
+
+
     /** Whether or not the fetch buffer data is valid. */
-    bool fetchBufferValid[MaxThreads];
+    //bool fetchBufferValid[MaxThreads];
+    std::list<bool> fetchBufferValid[MaxThreads];
 
     /** Size of instructions. */
     int instSize;
@@ -521,6 +556,20 @@ class Fetch
 
     /** Instruction port. Note that it has to appear after the fetch stage. */
     IcachePort icachePort;
+    bool smartL1;
+    // cms11 oracle
+    int32_t REPL;
+    double starveRandomness;
+    int32_t starveAtleast;
+    bool randomStarve;
+    bool pureRandom;
+    bool sbip;
+    bool resteer;
+    int32_t ftqSize;
+    bool trackLastBlock;
+    bool decodeIdle[MaxThreads];
+    Addr starvationPC[MaxThreads];
+    int32_t numSets;
 
     /** Set to true if a pipelined I-cache request should be issued. */
     bool issuePipelinedIfetch[MaxThreads];

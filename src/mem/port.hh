@@ -176,6 +176,8 @@ class RequestPort: public Port, public AtomicRequestProtocol,
      * @return If the send was succesful or not.
     */
     bool sendTimingReq(PacketPtr pkt);
+    bool sendTimingStarvationReq(PacketPtr pkt);
+    bool sendTimingWouldHaveStarved(PacketPtr pkt);
 
     /**
      * Check if the responder can handle a timing request.
@@ -500,6 +502,29 @@ RequestPort::sendTimingReq(PacketPtr pkt)
         reportUnbound();
     }
 }
+
+//EMISSARY: BEGIN
+inline bool
+RequestPort::sendTimingStarvationReq(PacketPtr pkt)
+{
+    try {
+        return TimingRequestProtocol::sendStarvationReq(_responsePort, pkt);
+    } catch (UnboundPortException) {
+        reportUnbound();
+    }
+}
+
+inline bool
+RequestPort::sendTimingWouldHaveStarved(PacketPtr pkt)
+{
+    try {
+        return TimingRequestProtocol::sendWouldHaveStarved(_responsePort, pkt);
+    } catch (UnboundPortException) {
+        reportUnbound();
+    }
+}
+//EMISSARY: END
+
 
 inline bool
 RequestPort::tryTiming(PacketPtr pkt) const

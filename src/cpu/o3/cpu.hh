@@ -622,6 +622,11 @@ class CPU : public BaseCPU
     /** Available thread ids in the cpu*/
     std::vector<ThreadID> tids;
 
+    //EMISSARY: BEGIN
+    typedef std::tuple<uint64_t, uint64_t, uint64_t> tms; // total, miss, starve, starve_rate
+    std::map<Addr, tms> tmsMap; // total, miss, starve, starve_rate
+    //EMISSARY: END
+
     /** CPU pushRequest function, forwards request to LSQ. */
     Fault pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
                       unsigned int size, Addr addr, Request::Flags flags,

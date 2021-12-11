@@ -405,6 +405,9 @@ class Commit
     /** Commit width, in instructions. */
     const unsigned commitWidth;
 
+    /** Number of Reorder Buffers */
+    unsigned numRobs;
+
     /** Number of Active Threads */
     const ThreadID numThreads;
 
@@ -438,6 +441,7 @@ class Commit
 
     /** The sequence number of the last commited instruction. */
     InstSeqNum lastCommitedSeqNum[MaxThreads];
+    InstSeqNum lastCommitedBrSeqNum[MaxThreads];
 
     /** Records if there is a trap currently in flight. */
     bool trapInFlight[MaxThreads];
@@ -467,9 +471,21 @@ class Commit
     /** Updates commit stats based on this instruction. */
     void updateComInstStats(const DynInstPtr &inst);
 
+    //uint32_t bblSize;
+    //Addr bblAddr;
+    //uint64_t bblSize[MaxThreads];
+    //Addr bblAddr[MaxThreads];
+
     // HTM
     int htmStarts[MaxThreads];
     int htmStops[MaxThreads];
+
+    uint64_t prevBranchFetchTick;
+    uint64_t mispredBrInstSeq;
+    uint64_t prevSeqNum;
+    uint64_t prevFetchTick;
+    bool isPrevBranch;
+    uint64_t instCount;
 
     struct CommitStats : public statistics::Group
     {
@@ -482,6 +498,14 @@ class Commit
          * to a non-speculative instruction reaching the head of the ROB.
          */
         statistics::Scalar commitNonSpecStalls;
+        statistics::Scalar decodeIdleNonSpecPath;
+        statistics::Scalar decodeIdleIQEmptyNonSpecPath;
+        statistics::Scalar decodeIdleNonSpecPathL2Hit;
+        statistics::Scalar decodeIdleNonSpecPathL2Miss;
+        statistics::Scalar fetchNonSpecBranchResteerCost;
+        statistics::Scalar fetchNonSpecResteerCost;
+        statistics::Scalar fetchNonSpecStallCost;
+        statistics::Scalar fetchNonSpecCost;
         /** Stat for the total number of branch mispredicts that caused a
          * squash.
          */

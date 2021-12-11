@@ -51,6 +51,7 @@
 
 #include "params/BaseIndexingPolicy.hh"
 #include "sim/sim_object.hh"
+#include "mem/cache/cache_blk.hh"
 
 namespace gem5
 {
@@ -95,6 +96,12 @@ class BaseIndexingPolicy : public SimObject
      * The amount to shift the address to get the tag.
      */
     const int tagShift;
+
+    // Number of ways for LRU mode
+    const unsigned lru_ways;
+
+    // Number of ways for Preserve mode
+    const unsigned preserve_ways;
 
   public:
     /**

@@ -311,9 +311,15 @@ TAGEBase::baseUpdate(Addr pc, bool taken, BranchInfo* bi)
     }
     const bool pred = inter >> 1;
     const bool hyst = inter & 1;
+    if(speculativeHistUpdate){
+        bi->updatedBiMode = true;
+        bi->biModePred = btablePrediction[bi->bimodalIndex]; 
+        bi->biModeHyst = btableHysteresis[bi->bimodalIndex >> logRatioBiModalHystEntries];
+    }
     btablePrediction[bi->bimodalIndex] = pred;
     btableHysteresis[bi->bimodalIndex >> logRatioBiModalHystEntries] = hyst;
     DPRINTF(Tage, "Updating branch %lx, pred:%d, hyst:%d\n", pc, pred, hyst);
+    DPRINTF(Tage, "Updating BIMODE Index:%d val:%d pc: %lx\n", bi->bimodalIndex, pred, pc);
 }
 
 // shifting the global history:  we manage the history in a big table in order
@@ -396,6 +402,7 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
                 bi->altTaken =
                     gtable[bi->altBank][tableIndices[bi->altBank]].ctr >= 0;
                 extraAltCalc(bi);
+                DPRINTF(Tage, "TAGE BI CHECK pc: 0x%lx altBank index:%d ctr: %d\n", branch_pc, bi->altBank, gtable[bi->altBank][tableIndices[bi->altBank]].ctr);
             }else {
                 bi->altTaken = getBimodePred(pc, bi);
             }
@@ -404,6 +411,7 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
                 gtable[bi->hitBank][tableIndices[bi->hitBank]].ctr >= 0;
             bi->pseudoNewAlloc =
                 abs(2 * gtable[bi->hitBank][bi->hitBankIndex].ctr + 1) <= 1;
+                DPRINTF(Tage, "TAGE BI CHECK pc: 0x%lx mainBank index:%d ctr: %d\n", branch_pc, bi->hitBank, gtable[bi->hitBank][tableIndices[bi->hitBank]].ctr);
 
             //if the entry is recognized as a newly allocated entry and
             //useAltPredForNewlyAllocated is positive use the alternate
@@ -431,6 +439,9 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
     }
     bi->branchPC = branch_pc;
     bi->condBranch = cond_branch;
+    DPRINTF(Tage, "Bgodala TAGE CHECK branch:%lx predict:%d\n",branch_pc, pred_taken);
+    DPRINTF(Tage, "TAGE BI CHECK hitBank: %d longestMatchPred: %d hitBankIndex: %d pseudoNewAlloc: %d provider: %d bimodalIndex: %d\n",
+bi->hitBank, bi->longestMatchPred, bi->hitBankIndex, bi->pseudoNewAlloc, bi->provider, bi->bimodalIndex);
     return pred_taken;
 }
 
@@ -445,6 +456,7 @@ TAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
                            int nrand)
 {
     if (alloc) {
+        DPRINTF(Tage, "tage reset useful ctr branch:%lx rand:%d\n", bi->branchPC, nrand);
         // is there some "unuseful" entry to allocate
         uint8_t min = 1;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
@@ -535,6 +547,7 @@ TAGEBase::condBranchUpdate(ThreadID tid, Addr branch_pc, bool taken,
             // if it was delivering the correct prediction, no need to
             // allocate new entry even if the overall prediction was false
             if (bi->longestMatchPred != bi->altTaken) {
+                DPRINTF(Tage, "Use Alt Pred for branch:%lx\n", branch_pc);
                 ctrUpdate(
                     useAltPredForNewlyAllocated[getUseAltIdx(bi, branch_pc)],
                     bi->altTaken == taken, useAltOnNaBits);
@@ -569,8 +582,10 @@ TAGEBase::handleTAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
                         " branch %lx\n", bi->hitBank, bi->hitBankIndex,
                         branch_pc);
             }
-            if (bi->altBank == 0) {
-                baseUpdate(branch_pc, taken, bi);
+            if(!speculativeHistUpdate){
+                if (bi->altBank == 0) {
+                    baseUpdate(branch_pc, taken, bi);
+                }
             }
         }
 
@@ -580,7 +595,9 @@ TAGEBase::handleTAGEUpdate(Addr branch_pc, bool taken, BranchInfo* bi)
                               bi->tagePred == taken, tagTableUBits);
         }
     } else {
-        baseUpdate(branch_pc, taken, bi);
+        if(!speculativeHistUpdate){
+            baseUpdate(branch_pc, taken, bi);
+        }
     }
 }
 
@@ -590,6 +607,7 @@ TAGEBase::updateHistories(ThreadID tid, Addr branch_pc, bool taken,
                           const StaticInstPtr &inst, Addr target)
 {
     if (speculative != speculativeHistUpdate) {
+        DPRINTF(Tage, "tage path branchPC: 0x%lx hist : %d global hist: %d\n", bi->branchPC, bi->pathHist, bi->ptGhist);
         return;
     }
     ThreadHistory& tHist = threadHistory[tid];
@@ -623,8 +641,27 @@ TAGEBase::updateHistories(ThreadID tid, Addr branch_pc, bool taken,
             tHist.ptGhist);
     assert(threadHistory[tid].gHist ==
             &threadHistory[tid].globalHistory[threadHistory[tid].ptGhist]);
+
+    // Speculatively update altBank
+    if(bi->hitBank > 0){
+        if (gtable[bi->hitBank][bi->hitBankIndex].u == 0) {
+          if(bi->altBank == 0){
+              baseUpdate(branch_pc, taken, bi);
+          }
+        }
+    }else{
+        baseUpdate(branch_pc, taken, bi);
+    }
 }
 
+void 
+TAGEBase::squash( ThreadID tid, BranchInfo *bi){
+    if(bi->updatedBiMode){
+        btablePrediction[bi->bimodalIndex] = bi->biModePred;
+        btableHysteresis[bi->bimodalIndex >> logRatioBiModalHystEntries] = bi->biModeHyst;
+        DPRINTF(Tage, "Reverting BIMODE Index:%d val:%d pc: %lx\n", bi->bimodalIndex, bi->biModePred, bi->branchPC);
+    }
+}
 void
 TAGEBase::squash(ThreadID tid, bool taken, TAGEBase::BranchInfo *bi,
                  Addr target)
@@ -649,6 +686,8 @@ TAGEBase::squash(ThreadID tid, bool taken, TAGEBase::BranchInfo *bi,
         tHist.computeTags[0][i].update(tHist.gHist);
         tHist.computeTags[1][i].update(tHist.gHist);
     }
+    // Roll back Bimodal base table entries which are updated
+    // speculatively
 }
 
 void

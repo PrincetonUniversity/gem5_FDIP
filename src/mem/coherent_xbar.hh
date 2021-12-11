@@ -113,6 +113,12 @@ class CoherentXBar : public BaseXBar
         }
 
         bool
+        recvTimingStarvationReq(PacketPtr pkt) override
+        {
+            return true;
+        }
+
+        bool
         recvTimingSnoopResp(PacketPtr pkt) override
         {
             return xbar.recvTimingSnoopResp(pkt, id);

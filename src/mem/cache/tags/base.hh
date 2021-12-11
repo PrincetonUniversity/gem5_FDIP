@@ -119,6 +119,7 @@ class BaseTags : public ClockedObject
 
         /** The total number of references to a block before it is replaced. */
         statistics::Scalar totalRefs;
+        statistics::Scalar totalStarves;
 
         /**
          * The number of reference counts sampled. This is different
@@ -132,6 +133,7 @@ class BaseTags : public ClockedObject
          * @todo This should change to an average stat once we have them.
          */
         statistics::Formula avgRefs;
+        statistics::Formula avgStarves;
 
         /** The tick that the warmup percentage was hit. 0 on failure. */
         statistics::Scalar warmupTick;
@@ -258,11 +260,13 @@ class BaseTags : public ClockedObject
 
         stats.occupancies[blk->getSrcRequestorId()]--;
         stats.totalRefs += blk->getRefCount();
+        stats.totalStarves += blk->isStarved();
         stats.sampledRefs++;
 
         blk->invalidate();
     }
 
+    virtual CacheBlk* starveMRU(Addr addr, bool is_secure) = 0;
     /**
      * Find replacement victim based on address. If the address requires
      * blocks to be evicted, their locations are listed for eviction. If a

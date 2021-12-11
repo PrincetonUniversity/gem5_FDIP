@@ -134,6 +134,7 @@ BaseCPU::BaseCPU(const Params &p, bool is_checker)
       previousCycle(0), previousState(CPU_STATE_SLEEP),
       functionTraceStream(nullptr), currentFunctionStart(0),
       currentFunctionEnd(0), functionEntryTick(0),
+      totalSimInsts(p.totalSimInsts),
       baseStats(this),
       addressMonitor(p.numThreads),
       syscallRetryLatency(p.syscallRetryLatency),

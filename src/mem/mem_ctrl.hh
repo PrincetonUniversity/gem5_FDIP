@@ -264,6 +264,7 @@ class MemCtrl : public qos::MemCtrl
         void recvFunctional(PacketPtr pkt) override;
 
         bool recvTimingReq(PacketPtr) override;
+        bool recvTimingStarvationReq(PacketPtr) { return true; }
 
         AddrRangeList getAddrRanges() const override;
 

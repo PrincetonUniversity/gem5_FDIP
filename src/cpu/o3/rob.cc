@@ -533,10 +533,16 @@ ROB::ROBStats::ROBStats(statistics::Group *parent)
 DynInstPtr
 ROB::findInst(ThreadID tid, InstSeqNum squash_inst)
 {
+    DPRINTF(ROB, "[tid:%i] Now has %d instructions.\n", tid, threadEntries[tid]);
+    DynInstPtr last = NULL;
     for (InstIt it = instList[tid].begin(); it != instList[tid].end(); it++) {
+        DPRINTF(ROB, "[tid:%i] %#x, %llu\n", tid, (*it)->pcState().instAddr(), (*it)->seqNum);
         if ((*it)->seqNum == squash_inst) {
             return *it;
-        }
+        } else if((*it)->seqNum < squash_inst)
+            last = *it;
+        else
+            return last;
     }
     return NULL;
 }

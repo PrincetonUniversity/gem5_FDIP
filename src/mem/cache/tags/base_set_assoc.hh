@@ -144,6 +144,7 @@ class BaseSetAssoc : public BaseTags
         if (blk != nullptr) {
             // Update number of references to accessed block
             blk->increaseRefCount();
+            blk->tickRecentAccess = curTick();
 
             // Update replacement data of accessed block
             replacementPolicy->touch(blk->replacementData, pkt);
@@ -155,6 +156,19 @@ class BaseSetAssoc : public BaseTags
         return blk;
     }
 
+    CacheBlk* starveMRU(Addr addr, bool is_secure) override
+    {
+        CacheBlk *blk = findBlock(addr, is_secure);
+
+        // If a cache hit
+        if (blk != nullptr) {
+            // Update replacement data of accessed block
+            replacementPolicy->starveMRU(blk->replacementData);
+        }
+
+        return blk;
+    }
+    
     /**
      * Find replacement victim based on address. The list of evicted blocks
      * only contains the victim.

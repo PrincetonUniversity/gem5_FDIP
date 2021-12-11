@@ -76,6 +76,7 @@ class StubSlavePort : public ExternalSlave::ExternalPort
     Tick recvAtomic(PacketPtr packet);
     void recvFunctional(PacketPtr packet);
     bool recvTimingReq(PacketPtr packet);
+    bool recvTimingStarvationReq(PacketPtr packet) { return true; }
     bool recvTimingSnoopResp(PacketPtr packet);
     void recvRespRetry();
     void recvFunctionalSnoop(PacketPtr packet);

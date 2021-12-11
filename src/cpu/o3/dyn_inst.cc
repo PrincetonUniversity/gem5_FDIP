@@ -57,7 +57,8 @@ DynInst::DynInst(const StaticInstPtr &static_inst,
         TheISA::PCState pred_pc, InstSeqNum seq_num, CPU *_cpu)
     : seqNum(seq_num), staticInst(static_inst), cpu(_cpu), pc(_pc),
       regs(staticInst->numSrcRegs(), staticInst->numDestRegs()),
-      predPC(pred_pc), macroop(_macroop)
+      predPC(pred_pc), macroop(_macroop),
+      icacheStallCycles(0)
 {
     this->regs.init();
 
@@ -93,6 +94,7 @@ DynInst::DynInst(const StaticInstPtr &static_inst,
 DynInst::DynInst(const StaticInstPtr &_staticInst,
         const StaticInstPtr &_macroop)
     : DynInst(_staticInst, _macroop, {}, {}, 0, nullptr)
+
 {}
 
 DynInst::~DynInst()
@@ -111,6 +113,20 @@ DynInst::~DynInst()
                      this->microPC(),
                      this->seqNum,
                      this->staticInst->disassemble(this->instAddr()));
+
+            // cms11
+            val = (this->memsentTick == -1) ? 0 : this->memsentTick;
+            DPRINTFR(O3PipeView, "O3PipeView:memsent:%llu\n", val);
+            val = (this->memrecvTick == -1) ? 0 : this->memrecvTick;
+            DPRINTFR(O3PipeView, "O3PipeView:memrecv:%llu:%d:%d:\n", val, this->memlevel, this->buf);
+            DPRINTFR(O3PipeView, "starve:0x%08llx:%d:%d:\n", this->instAddr(), this->memlevel, this->starve);
+ 
+            if (this->isControl()) {
+                DPRINTFR(O3PipeView, "O3PipeView:cacheHitMiss:\n");
+            } else {
+                DPRINTFR(O3PipeView, "O3PipeView:queueOcc:\n");
+            }
+            // end cms11
 
             val = (this->decodeTick == -1) ? 0 : fetch + this->decodeTick;
             DPRINTFR(O3PipeView, "O3PipeView:decode:%llu\n", val);

@@ -79,6 +79,7 @@ class TAGE: public BPredUnit
         }
     };
 
+    TageBranchInfo *prevBi;
     virtual bool predict(ThreadID tid, Addr branch_pc, bool cond_branch,
                          void* &b);
 

@@ -81,6 +81,9 @@ class MSHRQueue : public Queue<MSHR>
     MSHRQueue(const std::string &_label, int num_entries, int reserve,
               int demand_reserve, std::string cache_name);
 
+    /** Update the MLP based miss cost for all entries */
+    void updateMissCost(Cycles curCycle);
+
     /**
      * Allocates a new MSHR for the request and size. This places the request
      * as the first target in the MSHR.

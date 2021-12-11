@@ -196,6 +196,7 @@ class Bridge : public ClockedObject
         /** When receiving a timing request from the peer port,
             pass it to the bridge. */
         bool recvTimingReq(PacketPtr pkt);
+        bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
         /** When receiving a retry request from the peer port,
             pass it to the bridge. */

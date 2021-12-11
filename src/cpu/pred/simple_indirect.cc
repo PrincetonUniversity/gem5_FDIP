@@ -96,6 +96,7 @@ bool
 SimpleIndirectPredictor::lookup(Addr br_addr, TheISA::PCState& target,
     ThreadID tid)
 {
+    DPRINTF(Indirect, "Indirect GHR is %u\n",threadInfo[tid].ghr);
     Addr set_index = getSetIndex(br_addr, threadInfo[tid].ghr, tid);
     Addr tag = getTag(br_addr);
 
@@ -130,6 +131,9 @@ SimpleIndirectPredictor::commit(InstSeqNum seq_num, ThreadID tid,
     DPRINTF(Indirect, "Committing seq:%d\n", seq_num);
     ThreadInfo &t_info = threadInfo[tid];
 
+    if(!indirect_history){
+      return;
+    }
     // we do not need to recover the GHR, so delete the information
     unsigned * previousGhr = static_cast<unsigned *>(indirect_history);
     delete previousGhr;
@@ -219,10 +223,12 @@ SimpleIndirectPredictor::getSetIndex(Addr br_addr, unsigned ghr, ThreadID tid)
 {
     ThreadInfo &t_info = threadInfo[tid];
 
+    DPRINTF(Indirect, "br_addr is %llu\n",br_addr);
     Addr hash = br_addr >> instShift;
     if (hashGHR) {
         hash ^= ghr;
     }
+    DPRINTF(Indirect, "HASH after GHR XOR is %llu\n",hash);
     if (hashTargets) {
         unsigned hash_shift = floorLog2(numSets) / pathLength;
         for (int i = t_info.pathHist.size()-1, p = 0;
@@ -231,6 +237,7 @@ SimpleIndirectPredictor::getSetIndex(Addr br_addr, unsigned ghr, ThreadID tid)
                      (instShift + p*hash_shift));
         }
     }
+    DPRINTF(Indirect, "HASH after hashTargets is %llu\n",hash);
     return hash & (numSets-1);
 }
 

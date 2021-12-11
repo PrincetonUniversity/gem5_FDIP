@@ -59,7 +59,9 @@ BaseIndexingPolicy::BaseIndexingPolicy(const Params &p)
     : SimObject(p), assoc(p.assoc),
       numSets(p.size / (p.entry_size * assoc)),
       setShift(floorLog2(p.entry_size)), setMask(numSets - 1), sets(numSets),
-      tagShift(setShift + floorLog2(numSets))
+      tagShift(setShift + floorLog2(numSets)),
+      lru_ways(p.lru_ways),
+      preserve_ways(p.preserve_ways)
 {
     fatal_if(!isPowerOf2(numSets), "# of sets must be non-zero and a power " \
              "of 2");
@@ -93,6 +95,13 @@ BaseIndexingPolicy::setEntry(ReplaceableEntry* entry, const uint64_t index)
 
     // Inform the entry its position
     entry->setPosition(set, way);
+
+    CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
+
+    if (way < lru_ways) 
+        blk->rpMode = false;
+    else
+        blk->rpMode = true;
 }
 
 Addr

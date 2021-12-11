@@ -101,6 +101,12 @@ class DynInst : public ExecContext, public RefCounted
     /** The sequence number of the instruction. */
     InstSeqNum seqNum = 0;
 
+    //EMISSARY: BEGIN
+    InstSeqNum brSeqNum;
+    Addr bblAddr;
+    uint32_t bblSize;
+    //EMISSARY: END
+
     /** The StaticInst used by this BaseDynInst. */
     const StaticInstPtr staticInst;
 
@@ -549,6 +555,25 @@ class DynInst : public ExecContext, public RefCounted
      *  @todo: Actually use this instruction.
      */
     bool doneTargCalc() { return false; }
+
+    //EMISSARY: BEGIN
+    /** Set the branch seq number of current instruction. */
+    void setBrSeq(InstSeqNum _brseq)
+    {
+        brSeqNum = _brseq;
+    }
+
+    void setBblAddr(Addr _bblAddr)
+    {
+        bblAddr = _bblAddr;
+    }
+
+    void setBblSize(uint32_t _bblSize){
+        bblSize = _bblSize;
+    }
+
+    InstSeqNum readBrSeq() { return brSeqNum; }
+    //EMISSARY: END
 
     /** Set the predicted target of this current instruction. */
     void setPredTarg(const TheISA::PCState &_predPC) { predPC = _predPC; }
@@ -1083,10 +1108,33 @@ class DynInst : public ExecContext, public RefCounted
     uint64_t htmDepth = 0;
 
   public:
-#if TRACING_ON
+    Cycles icacheStallCycles;
+//#if TRACING_ON
     // Value -1 indicates that particular phase
     // hasn't happened (yet).
     /** Tick records used for the pipeline activity viewer. */
+    // cms11 edit
+    Tick memsentTick = -1;
+    Tick memrecvTick = -1;
+    int memlevel = -1;
+    bool buf = false;
+    bool starve = false;
+    int32_t idleCycles = -1;
+    int32_t idleIQEmptyCycles = -1;
+    int32_t idleCyclesSt = -1;
+    int32_t idleCyclesNoSt = -1;
+    uint32_t instQOccFetch = -1;
+    uint32_t instQOccDecode = -1;
+    long fetchIcacheMissL1Dump = -1;
+    long fetchIcacheMissL1StDump = -1;
+    long fetchIcacheMissL1NoStDump = -1;
+    char missSt = 0;
+    char L1MissSt = 0;
+    bool squashedFromThisInst = false;
+    bool isStalled = false;
+    char mispred = 0;
+    bool isBTBMiss = false;
+
     Tick fetchTick = -1;      // instruction fetch is completed.
     int32_t decodeTick = -1;  // instruction enters decode phase
     int32_t renameTick = -1;  // instruction enters rename phase
@@ -1095,7 +1143,7 @@ class DynInst : public ExecContext, public RefCounted
     int32_t completeTick = -1;
     int32_t commitTick = -1;
     int32_t storeTick = -1;
-#endif
+//#endif
 
     /* Values used by LoadToUse stat */
     Tick firstIssue = -1;

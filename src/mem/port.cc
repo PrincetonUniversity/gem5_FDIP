@@ -95,6 +95,8 @@ class DefaultResponsePort : public ResponsePort
 
     // Timing protocol.
     bool recvTimingReq(PacketPtr) override { blowUp(); }
+    bool recvTimingStarvationReq(PacketPtr) override { blowUp(); }
+    bool recvTimingWouldHaveStarved(PacketPtr) override { blowUp(); }
     bool tryTiming(PacketPtr) override { blowUp(); }
     bool recvTimingSnoopResp(PacketPtr) override { blowUp(); }
     void recvRespRetry() override { blowUp(); }

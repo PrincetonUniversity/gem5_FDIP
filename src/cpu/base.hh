@@ -555,6 +555,8 @@ class BaseCPU : public ClockedObject
     Tick functionEntryTick;
     void enableFunctionTrace();
     void traceFunctionsInternal(Addr pc);
+  public:
+    uint64_t totalSimInsts;
 
   private:
     static std::vector<BaseCPU *> cpuList;   //!< Static global cpu list

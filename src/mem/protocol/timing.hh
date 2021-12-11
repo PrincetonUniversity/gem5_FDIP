@@ -66,6 +66,8 @@ class TimingRequestProtocol
      * @return If the send was succesful or not.
      */
     bool sendReq(TimingResponseProtocol *peer, PacketPtr pkt);
+    bool sendStarvationReq(TimingResponseProtocol *peer, PacketPtr pkt);
+    bool sendWouldHaveStarved(TimingResponseProtocol *peer, PacketPtr pkt);
 
     /**
      * Check if the peer can handle a timing request.
@@ -167,6 +169,8 @@ class TimingResponseProtocol
      * Receive a timing request from the peer.
      */
     virtual bool recvTimingReq(PacketPtr pkt) = 0;
+    virtual bool recvTimingStarvationReq(PacketPtr pkt)  { return false; };
+    virtual bool recvTimingWouldHaveStarved(PacketPtr pkt) { return false; };
 
     /**
      * Availability request from the peer.

@@ -121,6 +121,7 @@ CPU::CPU(const O3CPUParams &params)
       lastRunningCycle(curCycle()),
       cpuStats(this)
 {
+    decode.instQueue = &iew.instQueue;
     fatal_if(FullSystem && params.numThreads > 1,
             "SMT is not supported in O3 in full system mode currently.");
 

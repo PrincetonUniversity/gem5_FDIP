@@ -120,6 +120,7 @@ class SimpleMemobj : public SimObject
          *         request again.
          */
         bool recvTimingReq(PacketPtr pkt) override;
+        bool recvTimingStarvationReq(PacketPtr pkt) override { return true; }
 
         /**
          * Called by the request port if sendTimingResp was called on this

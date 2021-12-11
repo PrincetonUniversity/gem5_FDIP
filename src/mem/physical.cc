@@ -441,15 +441,16 @@ PhysicalMemory::unserializeStore(CheckpointIn &cp)
     DPRINTF(Checkpoint, "Unserializing physical memory %s with size %d\n",
             filename, range_size);
 
-    if (range_size != range.size())
-        fatal("Memory range size has changed! Saw %lld, expected %lld\n",
-              range_size, range.size());
+    //if (range_size != range.size())
+    //    fatal("Memory range size has changed! Saw %lld, expected %lld\n",
+    //          range_size, range.size());
 
     uint64_t curr_size = 0;
     long* temp_page = new long[chunk_size];
     long* pmem_current;
     uint32_t bytes_read;
-    while (curr_size < range.size()) {
+    //while (curr_size < range.size()) {
+    while (curr_size < range_size) {
         bytes_read = gzread(compressed_mem, temp_page, chunk_size);
         if (bytes_read == 0)
             break;

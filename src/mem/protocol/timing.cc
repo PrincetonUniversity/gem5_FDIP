@@ -52,6 +52,23 @@ TimingRequestProtocol::sendReq(TimingResponseProtocol *peer, PacketPtr pkt)
     return peer->recvTimingReq(pkt);
 }
 
+//EMISSARY: BEGIN
+bool
+TimingRequestProtocol::sendStarvationReq(TimingResponseProtocol *peer, PacketPtr pkt)
+{
+    assert(pkt->isRequest());
+    return peer->recvTimingStarvationReq(pkt);
+}
+
+bool
+TimingRequestProtocol::sendWouldHaveStarved(TimingResponseProtocol *peer, PacketPtr pkt)
+{
+    assert(pkt->isRequest());
+    return peer->recvTimingWouldHaveStarved(pkt);
+}
+//EMISSARY: END
+
+
 bool
 TimingRequestProtocol::trySend(
         TimingResponseProtocol *peer, PacketPtr pkt) const

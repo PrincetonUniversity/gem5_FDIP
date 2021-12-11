@@ -83,6 +83,7 @@ class SMMUDevicePort : public QueuedResponsePort
     virtual void recvFunctional(PacketPtr pkt);
     virtual Tick recvAtomic(PacketPtr pkt);
     virtual bool recvTimingReq(PacketPtr pkt);
+    virtual bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
   public:
     SMMUDevicePort(const std::string &_name,
@@ -132,6 +133,7 @@ class SMMUATSDevicePort : public QueuedResponsePort
     virtual void recvFunctional(PacketPtr pkt);
     virtual Tick recvAtomic(PacketPtr pkt);
     virtual bool recvTimingReq(PacketPtr pkt);
+    virtual bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
     virtual AddrRangeList getAddrRanges() const
     { return AddrRangeList(); }

@@ -59,6 +59,7 @@ void
 TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
               bool squashed, const StaticInstPtr & inst, Addr corrTarget)
 {
+    DPRINTF(Tage, "Bgodala TAGE update is called\n");
     assert(bp_history);
 
     TageBranchInfo *bi = static_cast<TageBranchInfo*>(bp_history);
@@ -71,8 +72,11 @@ TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
         return;
     }
 
-    int nrand = random_mt.random<int>() & 3;
+    //int nrand = random_mt.random<int>() & 3;
+    // Bgodala removing randomness for sanity check
+    int nrand = 1;
     if (bi->tageBranchInfo->condBranch) {
+        tage_bi->isUpdated = true;
         DPRINTF(Tage, "Updating tables for branch:%lx; taken?:%d\n",
                 branch_pc, taken);
         tage->updateStats(taken, bi->tageBranchInfo);
@@ -83,7 +87,10 @@ TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
     // optional non speculative update of the histories
     tage->updateHistories(tid, branch_pc, taken, tage_bi, false, inst,
                           corrTarget);
-    delete bi;
+    if(prevBi){
+      delete prevBi;
+    }
+    prevBi = bi;
 }
 
 void
@@ -91,6 +98,8 @@ TAGE::squash(ThreadID tid, void *bp_history)
 {
     TageBranchInfo *bi = static_cast<TageBranchInfo*>(bp_history);
     DPRINTF(Tage, "Deleting branch info: %lx\n", bi->tageBranchInfo->branchPC);
+    TAGEBase::BranchInfo *tage_bi = bi->tageBranchInfo;
+    tage->squash(tid, tage_bi);
     delete bi;
 }
 
@@ -99,19 +108,27 @@ TAGE::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
 {
     TageBranchInfo *bi = new TageBranchInfo(*tage);//nHistoryTables+1);
     b = (void*)(bi);
-    return tage->tagePredict(tid, branch_pc, cond_branch, bi->tageBranchInfo);
+    bool pred_taken =  tage->tagePredict(tid, branch_pc, cond_branch, bi->tageBranchInfo);
+    DPRINTF(Tage, "Bgodala PREDICT FUNCTION TAGE CHECK Lookup branch: %lx; predict:%d\n", branch_pc, pred_taken);
+    DPRINTF(Tage, "predict: tid:%d bp_history:%lx\n",tid, b);
+    return pred_taken;
 }
 
 bool
 TAGE::lookup(ThreadID tid, Addr branch_pc, void* &bp_history)
 {
-    bool retval = predict(tid, branch_pc, true, bp_history);
+    bool retval=false;
+    retval = predict(tid, branch_pc, true, bp_history);
 
     TageBranchInfo *bi = static_cast<TageBranchInfo*>(bp_history);
 
     DPRINTF(Tage, "Lookup branch: %lx; predict:%d\n", branch_pc, retval);
 
     tage->updateHistories(tid, branch_pc, retval, bi->tageBranchInfo, true);
+    TAGEBase::BranchInfo *tage_bi = bi->tageBranchInfo;
+
+    DPRINTF(Tage, "At look up branch info: %lx; PathHistory:%x, "
+            "pointer:%d\n", tage_bi->branchPC, tage_bi->pathHist, tage_bi->ptGhist);
 
     return retval;
 }

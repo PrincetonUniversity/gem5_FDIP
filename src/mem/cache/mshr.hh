@@ -379,7 +379,22 @@ class MSHR : public QueueEntry, public Printable
 
     TargetList deferredTargets;
 
+    //EMISSARY: BEGIN
+    float miss_cost;
+    Cycles lastCycle;
+    //EMISSARY: END
+
   public:
+    //EMISSARY: BEGIN
+    float missCost() {
+        return miss_cost;
+    }
+
+    void updateMissCost(int N, Cycles curCycle) {
+        miss_cost += ((curCycle - lastCycle) / N);
+        lastCycle = curCycle;
+    }
+    //EMISSARY: END
     /**
      * Check if this MSHR contains only compatible writes, and if they
      * span the entire cache line. This is used as part of the

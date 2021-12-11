@@ -83,6 +83,7 @@ class DRAMSim2 : public AbstractMemory
         void recvFunctional(PacketPtr pkt);
 
         bool recvTimingReq(PacketPtr pkt);
+        bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
         void recvRespRetry();
 

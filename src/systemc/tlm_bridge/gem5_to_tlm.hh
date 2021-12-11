@@ -123,6 +123,11 @@ class Gem5ToTlmBridge : public Gem5ToTlmBridgeBase
             return bridge.recvTimingReq(pkt);
         }
         bool
+        recvTimingStarvationReq(gem5::PacketPtr pkt) override
+        {
+            return true;
+        }
+        bool
         tryTiming(gem5::PacketPtr pkt) override
         {
             return bridge.tryTiming(pkt);

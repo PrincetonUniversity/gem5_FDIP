@@ -44,6 +44,7 @@
 
 #include "base/random.hh"
 #include "debug/TageSCL.hh"
+#include "debug/Tage.hh"
 
 namespace gem5
 {
@@ -364,6 +365,7 @@ TAGE_SC_L_TAGE::extraAltCalc(TAGEBase::BranchInfo* bi)
 bool
 TAGE_SC_L::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
 {
+    DPRINTF(Tage, "Bgodala TAGE_SC_L\n");
     TageSCLBranchInfo *bi = new TageSCLBranchInfo(*tage,
                                                   *statisticalCorrector,
                                                   *loopPredictor);
@@ -413,6 +415,7 @@ void
 TAGE_SC_L::update(ThreadID tid, Addr branch_pc, bool taken, void *bp_history,
         bool squashed, const StaticInstPtr & inst, Addr corrTarget)
 {
+    DPRINTF(Tage, "Bgodala TAGE_SC_L update function called\n");
     assert(bp_history);
 
     TageSCLBranchInfo* bi = static_cast<TageSCLBranchInfo*>(bp_history);

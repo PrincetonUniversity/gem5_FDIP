@@ -108,6 +108,12 @@ class NoncoherentXBar : public BaseXBar
             return xbar.recvTimingReq(pkt, id);
         }
 
+        bool
+        recvTimingStarvationReq(PacketPtr pkt) override
+        {
+            return true;
+        }
+
         Tick
         recvAtomic(PacketPtr pkt) override
         {

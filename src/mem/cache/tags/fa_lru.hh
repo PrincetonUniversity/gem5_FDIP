@@ -207,6 +207,8 @@ class FALRU : public BaseTags
      */
     ReplaceableEntry* findBlockBySetAndWay(int set, int way) const override;
 
+    CacheBlk* starveMRU(Addr addr, bool is_secure) override { return nullptr; }
+    
     /**
      * Find replacement victim based on address. The list of evicted blocks
      * only contains the victim.

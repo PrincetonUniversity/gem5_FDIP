@@ -42,6 +42,8 @@ class BaseIndexingPolicy(SimObject):
 
     # Get the associativity
     assoc = Param.Int(Parent.assoc, "associativity")
+    lru_ways = Param.Int(Parent.lru_ways, "Number of ways for LRU mode");
+    preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways for Preserve mode");
 
 class SetAssociative(BaseIndexingPolicy):
     type = 'SetAssociative'

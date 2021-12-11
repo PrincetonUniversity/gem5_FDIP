@@ -94,6 +94,7 @@ class RubyPort : public ClockedObject
 
       protected:
         bool recvTimingReq(PacketPtr pkt);
+        bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
         Tick recvAtomic(PacketPtr pkt);
 
@@ -133,6 +134,7 @@ class RubyPort : public ClockedObject
 
       protected:
         bool recvTimingReq(PacketPtr pkt);
+        bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
         Tick recvAtomic(PacketPtr pkt);
 

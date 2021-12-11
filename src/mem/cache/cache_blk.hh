@@ -86,11 +86,14 @@ class CacheBlk : public TaggedEntry
         /** dirty (modified) */
         DirtyBit =          0x08,
 
+        /** Nayana added - Line that caused Decode Starvation */
+        BlkStarved =        0x10,
+        BlkPreserve =        0x200,
         /**
          * Helper enum value that includes all other bits. Whenever a new
          * bits is added, this should be updated.
          */
-        AllBits  =          0x0E,
+        AllBits  =          0x21E,
     };
 
     /**
@@ -107,6 +110,20 @@ class CacheBlk : public TaggedEntry
      * meaningful if the block is valid.
      */
     Tick whenReady;
+
+    //EMISSARY: BEGIN
+    Tick tickRecentAccess;
+    unsigned l1AccessCount;
+    unsigned starveCount;
+    uint8_t starveHistory;
+
+    // Nayana added to know which mode we are in LRU Mode or Preserve Mode
+    // false: LRU Mode
+    // true: Preserve/Emissary Mode
+    bool rpMode;
+    unsigned miss_cost; // this is MLP based miss cost
+    unsigned recency_stack;
+    //EMISSARY: END
 
   protected:
     /**
@@ -248,6 +265,20 @@ class CacheBlk : public TaggedEntry
      */
     bool wasPrefetched() const { return _prefetched; }
 
+    //EMISSARY: BEGIN
+    bool isStarved() const
+    {
+        //return (status & BlkStarved) != 0;
+        return (coherence & BlkStarved) != 0;
+    }
+
+    bool isPreserve() const
+    {
+        //return (status & BlkPreserve) != 0;
+        return (coherence & BlkPreserve) != 0;
+    }
+    //EMISSARY: END
+
     /**
      * Clear the prefetching bit. Either because it was recently used, or due
      * to the block being invalidated.
@@ -289,6 +320,9 @@ class CacheBlk : public TaggedEntry
 
     /** Get the number of references to this block since insertion. */
     unsigned getRefCount() const { return _refCount; }
+
+    /** Get the number of references to this block since insertion. */
+    unsigned getTickInserted() const { return _tickInserted; }
 
     /** Get the number of references to this block since insertion. */
     void increaseRefCount() { _refCount++; }
@@ -399,8 +433,10 @@ class CacheBlk : public TaggedEntry
           default:    s = 'T'; break; // @TODO add other types
         }
         return csprintf("state: %x (%c) writable: %d readable: %d "
-            "dirty: %d prefetched: %d | %s", coherence, s,
+            //"dirty: %d prefetched: %d | %s", coherence, s,
+            "dirty: %d starved: %d preserved: %d prefetched: %d | %s", coherence, s,
             isSet(WritableBit), isSet(ReadableBit), isSet(DirtyBit),
+            isStarved(), isPreserve(),
             wasPrefetched(), TaggedEntry::print());
     }
 

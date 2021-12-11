@@ -321,6 +321,8 @@ class BaseCache : public ClockedObject
         virtual bool tryTiming(PacketPtr pkt) override;
 
         virtual bool recvTimingReq(PacketPtr pkt) override;
+        virtual bool recvTimingStarvationReq(PacketPtr pkt) override;
+        virtual bool recvTimingWouldHaveStarved(PacketPtr pkt) override;
 
         virtual Tick recvAtomic(PacketPtr pkt) override;
 
@@ -535,6 +537,8 @@ class BaseCache : public ClockedObject
      * @param pkt The request to perform.
      */
     virtual void recvTimingReq(PacketPtr pkt);
+    virtual bool recvTimingStarvationReq(PacketPtr pkt);
+    virtual bool recvTimingWouldHaveStarved(PacketPtr pkt);
 
     /**
      * Handling the special case of uncacheable write responses to
@@ -1163,6 +1167,7 @@ class BaseCache : public ClockedObject
 
     MSHR *allocateMissBuffer(PacketPtr pkt, Tick time, bool sched_send = true)
     {
+        mshrQueue.updateMissCost(curCycle());
         MSHR *mshr = mshrQueue.allocate(pkt->getBlockAddr(blkSize), blkSize,
                                         pkt, time, order++,
                                         allocOnFill(pkt->cmd));

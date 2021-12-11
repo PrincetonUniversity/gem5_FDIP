@@ -654,6 +654,10 @@ Rename::renameInsts(ThreadID tid)
                 "Processing instruction [sn:%llu] with PC %s.\n",
                 tid, inst->seqNum, inst->pcState());
 
+        //EMISSARY: BEGIN
+        cpu->switchRenameMode(tid, freeList);
+        //EMISSARY: END
+        
         // Check here to make sure there are enough destination registers
         // to rename to.  Otherwise block.
         if (!renameMap[tid]->canRename(inst->numIntDestRegs(),
@@ -1193,11 +1197,17 @@ Rename::readStallSignals(ThreadID tid)
 {
     if (fromIEW->iewBlock[tid]) {
         stalls[tid].iew = true;
+        //EMISSARY: BEGIN
+        toDecode->iewBlock[tid] = true;
+        //EMISSARY: END
     }
 
     if (fromIEW->iewUnblock[tid]) {
         assert(stalls[tid].iew);
         stalls[tid].iew = false;
+        //EMISSARY: BEGIN
+        toDecode->iewBlock[tid] = false;
+        //EMISSARY: END 
     }
 }
 

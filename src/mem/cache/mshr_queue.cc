@@ -59,6 +59,13 @@ MSHRQueue::MSHRQueue(const std::string &_label,
       demandReserve(demand_reserve)
 {}
 
+void
+MSHRQueue::updateMissCost(Cycles curCycle) {
+    for (const auto& entry : allocatedList) {
+        entry->updateMissCost(allocated, curCycle);
+    }
+}
+
 MSHR *
 MSHRQueue::allocate(Addr blk_addr, unsigned blk_size, PacketPtr pkt,
                     Tick when_ready, Counter order, bool alloc_on_fill)

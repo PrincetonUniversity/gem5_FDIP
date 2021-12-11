@@ -79,6 +79,7 @@ class SimpleTimingPort : public QueuedResponsePort
 
     /** Implemented using recvAtomic(). */
     bool recvTimingReq(PacketPtr pkt);
+    bool recvTimingStarvationReq(PacketPtr pkt);
 
     virtual Tick recvAtomic(PacketPtr pkt) = 0;
 

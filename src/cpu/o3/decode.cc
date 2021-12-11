@@ -70,6 +70,7 @@ Decode::Decode(CPU *_cpu, const O3CPUParams &params)
       fetchToDecodeDelay(params.fetchToDecodeDelay),
       decodeWidth(params.decodeWidth),
       numThreads(params.numThreads),
+      emissaryEnableIQEmpty(params.emissaryEnableIQEmpty),
       stats(_cpu)
 {
     if (decodeWidth > MaxWidth)
@@ -78,13 +79,16 @@ Decode::Decode(CPU *_cpu, const O3CPUParams &params)
              decodeWidth, static_cast<int>(MaxWidth));
 
     // @todo: Make into a parameter
-    skidBufferMax = (fetchToDecodeDelay + 1) *  params.fetchWidth;
+    // Nayana commented
+    skidBufferMax = 5000; //(fetchToDecodeDelay + 1) *  params->fetchWidth;
     for (int tid = 0; tid < MaxThreads; tid++) {
         stalls[tid] = {false};
         decodeStatus[tid] = Idle;
         bdelayDoneSeqNum[tid] = 0;
         squashInst[tid] = nullptr;
         squashAfterDelaySlot[tid] = 0;
+        idleCount[tid] = 0;
+        idleIQEmptyCount[tid] = 0;
     }
 }
 
@@ -99,6 +103,8 @@ Decode::clearStates(ThreadID tid)
 {
     decodeStatus[tid] = Idle;
     stalls[tid].rename = false;
+    idleCount[tid] = 0;
+    idleIQEmptyCount[tid] = 0;
 }
 
 void
@@ -109,6 +115,8 @@ Decode::resetStage()
     // Setup status, make sure stall signals are clear.
     for (ThreadID tid = 0; tid < numThreads; ++tid) {
         decodeStatus[tid] = Idle;
+        idleCount[tid] = 0;
+        idleIQEmptyCount[tid] = 0;
 
         stalls[tid].rename = false;
     }
@@ -285,6 +293,8 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
 {
     DPRINTF(Decode, "[tid:%i] [sn:%llu] Squashing due to incorrect branch "
             "prediction detected at decode.\n", tid, inst->seqNum);
+    idleCount[tid] = 0;
+    idleIQEmptyCount[tid] = 0;
 
     // Send back mispredict information.
     toFetch->decodeInfo[tid].branchMispredict = true;
@@ -292,6 +302,7 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
     toFetch->decodeInfo[tid].mispredictInst = inst;
     toFetch->decodeInfo[tid].squash = true;
     toFetch->decodeInfo[tid].doneSeqNum = inst->seqNum;
+    toFetch->decodeInfo[tid].doneBrSeqNum = inst->brSeqNum;
     toFetch->decodeInfo[tid].nextPC = inst->branchTarget();
 
     // Looking at inst->pcState().branching()
@@ -305,6 +316,11 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
                                            inst->isUncondCtrl();
 
     toFetch->decodeInfo[tid].squashInst = inst;
+    toFetch->decodeInfo[tid].bblSize = inst->bblSize;
+    toFetch->decodeInfo[tid].bblAddr = inst->bblAddr;
+    if (toFetch->decodeInfo[tid].mispredictInst->isUncondCtrl()) {
+            toFetch->decodeInfo[tid].branchTaken = true;
+    }
 
     InstSeqNum squash_seq_num = inst->seqNum;
 
@@ -342,6 +358,8 @@ unsigned
 Decode::squash(ThreadID tid)
 {
     DPRINTF(Decode, "[tid:%i] Squashing.\n",tid);
+    idleCount[tid] = 0;
+    idleIQEmptyCount[tid] = 0;
 
     if (decodeStatus[tid] == Blocked ||
         decodeStatus[tid] == Unblocking) {
@@ -406,7 +424,8 @@ Decode::skidInsert(ThreadID tid)
 
     // @todo: Eventually need to enforce this by not letting a thread
     // fetch past its skidbuffer
-    assert(skidBuffer[tid].size() <= skidBufferMax);
+    // Nayana commented
+    //assert(skidBuffer[tid].size() <= skidBufferMax);
 }
 
 bool
@@ -476,12 +495,15 @@ Decode::readStallSignals(ThreadID tid)
 {
     if (fromRename->renameBlock[tid]) {
         stalls[tid].rename = true;
+        toFetch->renameBlock[tid] = true;
     }
 
     if (fromRename->renameUnblock[tid]) {
         assert(stalls[tid].rename);
         stalls[tid].rename = false;
+        toFetch->renameBlock[tid] = false;
     }
+    toFetch->iewBlock[tid] = fromRename->iewBlock[tid];
 }
 
 bool
@@ -587,8 +609,12 @@ Decode::decode(bool &status_change, ThreadID tid)
 
     if (decodeStatus[tid] == Blocked) {
         ++stats.blockedCycles;
+        idleCount[tid] = 0;
+        idleIQEmptyCount[tid] = 0;
     } else if (decodeStatus[tid] == Squashing) {
         ++stats.squashCycles;
+        idleCount[tid] = 0;
+        idleIQEmptyCount[tid] = 0;
     }
 
     // Decode should try to decode as many instructions as its bandwidth
@@ -632,6 +658,15 @@ Decode::decodeInsts(ThreadID tid)
                 " early.\n",tid);
         // Should I change the status to idle?
         ++stats.idleCycles;
+        idleCount[tid]++;
+	    if(instQueue->getCount(tid)==0){
+            idleIQEmptyCount[tid]++;
+	    }
+	    if(emissaryEnableIQEmpty){
+            toFetch->decodeIdle[tid] = instQueue->getCount(tid) == 0 ? true : false;
+	    }else{
+            toFetch->decodeIdle[tid] = true;
+	    }
         return;
     } else if (decodeStatus[tid] == Unblocking) {
         DPRINTF(Decode, "[tid:%i] Unblocking, removing insts from skid "
@@ -641,12 +676,14 @@ Decode::decodeInsts(ThreadID tid)
         ++stats.runCycles;
     }
 
+    toFetch->decodeIdle[tid] = false;
     std::queue<DynInstPtr>
         &insts_to_decode = decodeStatus[tid] == Unblocking ?
         skidBuffer[tid] : insts[tid];
 
     DPRINTF(Decode, "[tid:%i] Sending instruction to rename.\n",tid);
 
+    int i=0;
     while (insts_available > 0 && toRenameIndex < decodeWidth) {
         assert(!insts_to_decode.empty());
 
@@ -692,6 +729,26 @@ Decode::decodeInsts(ThreadID tid)
             inst->decodeTick = curTick() - inst->fetchTick;
         }
 #endif
+            inst->decodeTick = curTick() - inst->fetchTick;
+        inst->idleCycles = idleCount[tid];
+        inst->idleIQEmptyCycles = idleIQEmptyCount[tid];
+        inst->instQOccDecode = instQueue->getCount(tid);
+        if(inst->missSt == 'S'){
+            inst->idleCyclesSt = idleCount[tid];
+            inst->idleCyclesNoSt = 0;
+        } else if(inst->missSt == 'N'){
+            inst->idleCyclesSt = 0;
+            inst->idleCyclesNoSt = idleCount[tid];
+        } else{
+            inst->idleCyclesSt = 0;
+            inst->idleCyclesNoSt = 0;
+        }
+
+        idleCount[tid] = 0;
+        idleIQEmptyCount[tid] = 0;
+
+        i++;
+        bblSize[inst->threadNumber]++;
 
         // Ensure that if it was predicted as a branch, it really is a
         // branch.
@@ -721,6 +778,8 @@ Decode::decodeInsts(ThreadID tid)
                 // Might want to set some sort of boolean and just do
                 // a check at the end
                 squash(inst, inst->threadNumber);
+                bblSize[inst->threadNumber] = 0;
+                bblAddr[inst->threadNumber] = inst->branchTarget().instAddr();
                 TheISA::PCState target = inst->branchTarget();
 
                 DPRINTF(Decode,
@@ -732,6 +791,11 @@ Decode::decodeInsts(ThreadID tid)
                 inst->setPredTarg(target);
                 break;
             }
+            bblAddr[inst->threadNumber] = inst->branchTarget().instAddr();
+        }
+
+        if (inst->isControl()) {
+            bblSize[inst->threadNumber] = 0;
         }
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018-2020 Inria
+ * Copyright (c) 2018 Inria
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,96 +26,103 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MEM_CACHE_REPLACEMENT_POLICIES_BASE_HH__
-#define __MEM_CACHE_REPLACEMENT_POLICIES_BASE_HH__
+/**
+ * @file
+ * Declaration of a Least Recently Used replacement policy.
+ * The victim is chosen using the last touch timestamp.
+ */
 
-#include <memory>
+#ifndef __MEM_CACHE_REPLACEMENT_POLICIES_MLP_LIN_RP_HH__
+#define __MEM_CACHE_REPLACEMENT_POLICIES_MLP_LIN_RP_HH__
 
-#include "base/compiler.hh"
-#include "mem/cache/replacement_policies/replaceable_entry.hh"
-#include "mem/packet.hh"
-#include "params/BaseReplacementPolicy.hh"
-#include "sim/sim_object.hh"
+#include "mem/cache/replacement_policies/base.hh"
+#include "mem/cache/cache_blk.hh"
 
 namespace gem5
 {
 
-/**
- * Replacement candidates as chosen by the indexing policy.
- */
-typedef std::vector<ReplaceableEntry*> ReplacementCandidates;
+struct MLPLINRPParams;
 
 GEM5_DEPRECATED_NAMESPACE(ReplacementPolicy, replacement_policy);
 namespace replacement_policy
 {
 
-/**
- * A common base class of cache replacement policy objects.
- */
-class Base : public SimObject
+class MLPLIN : public Base
 {
+  protected:
+    /** MLPLIN-specific implementation of replacement data. */
+    struct MLPLINReplData : ReplacementData
+    {
+        /** Tick on which the entry was last touched. */
+        Tick lastTouchTick;
+
+        /**
+         * Default constructor. Invalidate data.
+         */
+        MLPLINReplData() : lastTouchTick(0) {}
+    };
+
   public:
-    typedef BaseReplacementPolicyParams Params;
-    Base(const Params &p) : SimObject(p) {}
-    virtual ~Base() = default;
+    /** Convenience typedef. */
+    typedef MLPLINRPParams Params;
+
+    /**
+     * Construct and initiliaze this replacement policy.
+     */
+    MLPLIN(const Params &p);
+
+    /**
+     * Destructor.
+     */
+    ~MLPLIN() {}
 
     /**
      * Invalidate replacement data to set it as the next probable victim.
+     * Sets its last touch tick as the starting tick.
      *
      * @param replacement_data Replacement data to be invalidated.
      */
-    virtual void invalidate(const std::shared_ptr<ReplacementData>&
-        replacement_data) = 0;
+    void invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
+                                                              override;
 
     /**
-     * Update replacement data.
+     * Touch an entry to update its replacement data.
+     * Sets its last touch tick as the current tick.
      *
      * @param replacement_data Replacement data to be touched.
-     * @param pkt Packet that generated this access.
      */
-    virtual void touch(const std::shared_ptr<ReplacementData>&
-        replacement_data, const PacketPtr pkt)
-    {
-        touch(replacement_data);
-    }
-    virtual void touch(const std::shared_ptr<ReplacementData>&
-        replacement_data) const = 0;
+    void touch(const std::shared_ptr<ReplacementData>& replacement_data) const
+                                                                     override;
 
     /**
-     * Reset replacement data. Used when it's holder is inserted/validated.
+     * Reset replacement data. Used when an entry is inserted.
+     * Sets its last touch tick as the current tick.
      *
      * @param replacement_data Replacement data to be reset.
-     * @param pkt Packet that generated this access.
      */
-    virtual void reset(const std::shared_ptr<ReplacementData>&
-        replacement_data, const PacketPtr pkt)
-    {
-        reset(replacement_data);
-    }
-    virtual void reset(const std::shared_ptr<ReplacementData>&
-        replacement_data) const = 0;
-
-    virtual void starveMRU(const std::shared_ptr<ReplacementData>&
-                                                replacement_data) const { return; };
+    void reset(const std::shared_ptr<ReplacementData>& replacement_data) const
+                                                                     override;
+    void starveMRU(const std::shared_ptr<ReplacementData>& replacement_data) const
+                                                                     override {}
 
     /**
-     * Find replacement victim among candidates.
+     * Find replacement victim using MLPLIN timestamps.
      *
      * @param candidates Replacement candidates, selected by indexing policy.
      * @return Replacement entry to be replaced.
      */
-    virtual ReplaceableEntry* getVictim(
-                           const ReplacementCandidates& candidates) const = 0;
+    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates) const
+                                                                     override;
 
     /**
      * Instantiate a replacement data entry.
      *
      * @return A shared pointer to the new replacement data.
      */
-    virtual std::shared_ptr<ReplacementData> instantiateEntry() = 0;
+    std::shared_ptr<ReplacementData> instantiateEntry() override;
 };
 
 } // namespace replacement_policy
 } // namespace gem5
 
-#endif // __MEM_CACHE_REPLACEMENT_POLICIES_BASE_HH__
+#endif // __MEM_CACHE_REPLACEMENT_POLICIES_MLP_LIN_RP_HH__

@@ -140,6 +140,11 @@ class TAGEBase : public SimObject
         bool condBranch;
         bool longestMatchPred;
         bool pseudoNewAlloc;
+        bool isUpdated; 
+        bool biModePred;
+        bool biModeHyst;
+        bool updatedBiMode;
+
         Addr branchPC;
 
         // Pointer to dynamically allocated storage
@@ -165,8 +170,10 @@ class TAGEBase : public SimObject
               bimodalIndex(0),
               tagePred(false), altTaken(false),
               condBranch(false), longestMatchPred(false),
-              pseudoNewAlloc(false), branchPC(0),
-              provider(-1)
+              pseudoNewAlloc(false), isUpdated(false),
+              biModePred(false), biModeHyst(false),
+              updatedBiMode(false),
+              branchPC(0), provider(-1)
         {
             int sz = tage.nHistoryTables + 1;
             storage = new int [sz * 5];
@@ -312,6 +319,9 @@ class TAGEBase : public SimObject
      */
     virtual void squash(
         ThreadID tid, bool taken, BranchInfo *bi, Addr target);
+
+    virtual void squash(
+        ThreadID tid, BranchInfo *bi);
 
     /**
      * Update TAGE for conditional branches.

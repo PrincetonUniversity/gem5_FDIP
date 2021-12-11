@@ -60,6 +60,12 @@ SimpleTimingPort::recvFunctional(PacketPtr pkt)
 }
 
 bool
+SimpleTimingPort::recvTimingStarvationReq(PacketPtr pkt)
+{
+    return true;
+}
+
+bool
 SimpleTimingPort::recvTimingReq(PacketPtr pkt)
 {
     // the SimpleTimingPort should not be used anywhere where there is

@@ -847,6 +847,13 @@ Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
             }
             // Reset the bus additional time as it is now accounted for
             tgt_pkt->headerDelay = tgt_pkt->payloadDelay = 0;
+            //EMISSARY: BEGIN
+            if(isReadOnly) {
+                tgt_pkt->starveHistory = pkt->starveHistory;
+                tgt_pkt->starveCount = pkt->starveCount;
+                tgt_pkt->accessCount = pkt->accessCount;
+            }
+            //EMISSARY: END
             cpuSidePort.schedTimingResp(tgt_pkt, completion_time);
             break;
 

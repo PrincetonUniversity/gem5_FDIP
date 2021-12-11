@@ -43,6 +43,7 @@
 #define __CPU_O3_COMM_HH__
 
 #include <vector>
+#include <deque>
 
 #include "arch/pcstate.hh"
 #include "base/types.hh"
@@ -93,6 +94,7 @@ struct IEWStruct
     DynInstPtr mispredictInst[MaxThreads];
     Addr mispredPC[MaxThreads];
     InstSeqNum squashedSeqNum[MaxThreads];
+    InstSeqNum squashedBrSeqNum[MaxThreads];
     TheISA::PCState pc[MaxThreads];
 
     bool squash[MaxThreads];
@@ -117,6 +119,7 @@ struct TimeStruct
         DynInstPtr mispredictInst;
         DynInstPtr squashInst;
         InstSeqNum doneSeqNum;
+        InstSeqNum doneBrSeqNum;
         Addr mispredPC;
         uint64_t branchAddr;
         unsigned branchCount;
@@ -124,6 +127,8 @@ struct TimeStruct
         bool predIncorrect;
         bool branchMispredict;
         bool branchTaken;
+        uint64_t bblSize;
+        Addr bblAddr;
     };
 
     DecodeComm decodeInfo[MaxThreads];
@@ -170,6 +175,10 @@ struct TimeStruct
         /// order violation and the like
         TheISA::PCState pc; // *F
 
+        uint32_t bblSize;
+        Addr bblAddr;
+        //std::deque<uint64_t> bblSize;
+        //std::deque<Addr> bblAddr;
         /// Provide fetch the instruction that mispredicted, if this
         /// pointer is not-null a misprediction occured
         DynInstPtr mispredictInst;  // *F
@@ -189,6 +198,8 @@ struct TimeStruct
         /// squashed.  Similar to having a single bus that broadcasts the
         /// retired or squashed sequence number.
         InstSeqNum doneSeqNum; // *F, I
+        InstSeqNum doneBrSeqNum;
+        std::deque<DynInstPtr> doneInst;
 
         /// Tell Rename how many free entries it has in the ROB
         unsigned freeROBEntries; // *R
@@ -218,6 +229,7 @@ struct TimeStruct
     CommitComm commitInfo[MaxThreads];
 
     bool decodeBlock[MaxThreads];
+    bool decodeIdle[MaxThreads];
     bool decodeUnblock[MaxThreads];
     bool renameBlock[MaxThreads];
     bool renameUnblock[MaxThreads];

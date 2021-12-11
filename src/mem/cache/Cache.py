@@ -78,6 +78,8 @@ class BaseCache(ClockedObject):
 
     size = Param.MemorySize("Capacity")
     assoc = Param.Unsigned("Associativity")
+    lru_ways = Param.Unsigned(4, "Number of ways for LRU mode");
+    preserve_ways = Param.Unsigned(4, "Number of ways for Preserve mode");
 
     tag_latency = Param.Cycles("Tag lookup latency")
     data_latency = Param.Cycles("Data access latency")

@@ -123,6 +123,7 @@ class MemSinkCtrl : public MemCtrl
         * @return true if the request was accepted
         */
         bool recvTimingReq(PacketPtr pkt);
+        bool recvTimingStarvationReq(PacketPtr pkt) { return true; }
 
         /**
          * Gets the configured address ranges for this port

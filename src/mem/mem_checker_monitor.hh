@@ -176,6 +176,11 @@ class MemCheckerMonitor : public SimObject
             return mon.recvTimingReq(pkt);
         }
 
+        bool recvTimingStarvationReq(PacketPtr pkt)
+        {
+            return true;
+        }
+
         bool recvTimingSnoopResp(PacketPtr pkt)
         {
             return mon.recvTimingSnoopResp(pkt);

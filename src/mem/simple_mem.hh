@@ -99,6 +99,7 @@ class SimpleMemory : public AbstractMemory
                 PacketPtr pkt, MemBackdoorPtr &_backdoor) override;
         void recvFunctional(PacketPtr pkt) override;
         bool recvTimingReq(PacketPtr pkt) override;
+        bool recvTimingStarvationReq(PacketPtr pkt) override { return true; }
         void recvRespRetry() override;
         AddrRangeList getAddrRanges() const override;
     };

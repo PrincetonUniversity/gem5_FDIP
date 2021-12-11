@@ -314,6 +314,10 @@ MSHR::allocate(Addr blk_addr, unsigned blk_size, PacketPtr target,
     _isUncacheable = target->req->isUncacheable();
     inService = false;
     downstreamPending = false;
+    
+    //EMISSARY: BEGIN
+    miss_cost = 0;
+    //EMISSARY: END
 
     targets.init(blkAddr, blkSize);
     deferredTargets.init(blkAddr, blkSize);

@@ -67,6 +67,11 @@
 #include "params/O3CPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
+#include "debug/Bgodala.hh"
+#include "debug/CommTrace.hh"
+#include "debug/MispredCommTrace.hh"
+#include "sim/pseudo_inst.hh"
+#include "debug/StarvationCounts.hh"
 
 namespace gem5
 {
@@ -97,6 +102,12 @@ Commit::Commit(CPU *_cpu, const O3CPUParams &params)
       trapLatency(params.trapLatency),
       canHandleInterrupts(true),
       avoidQuiesceLiveLock(false),
+      prevBranchFetchTick(0),
+      mispredBrInstSeq(0),
+      prevSeqNum(0),
+      prevFetchTick(0),
+      isPrevBranch(false),
+      instCount(1),
       stats(_cpu, this)
 {
     if (commitWidth > MaxWidth)
@@ -123,10 +134,13 @@ Commit::Commit(CPU *_cpu, const O3CPUParams &params)
         pc[tid].set(0);
         youngestSeqNum[tid] = 0;
         lastCommitedSeqNum[tid] = 0;
+        lastCommitedBrSeqNum[tid] = 0;
         trapInFlight[tid] = false;
         committedStores[tid] = false;
         checkEmptyROB[tid] = false;
         renameMap[tid] = nullptr;
+        //bblSize[tid] = 0;
+        //bblAddr[tid] = 0;
         htmStarts[tid] = 0;
         htmStops[tid] = 0;
     }
@@ -153,6 +167,14 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
       ADD_STAT(commitNonSpecStalls, statistics::units::Count::get(),
                "The number of times commit has been forced to stall to "
                "communicate backwards"),
+      ADD_STAT(decodeIdleNonSpecPath, "The number of cycles decode starved in the correct path"),
+      ADD_STAT(decodeIdleIQEmptyNonSpecPath, "The number of cycles decode starved in the correct path when IQ was empty"),
+      ADD_STAT(decodeIdleNonSpecPathL2Hit, "The number of cycles decode starved in the correct path when hit in L2"),
+      ADD_STAT(decodeIdleNonSpecPathL2Miss, "The number of cycles decode starved in the correct path when miss in L2"),
+      ADD_STAT(fetchNonSpecBranchResteerCost, "Branch Resteer Cost in fetch"),
+      ADD_STAT(fetchNonSpecResteerCost, "Resteer Cost in fetch"),
+      ADD_STAT(fetchNonSpecStallCost, "Stall Cost in fetch"),
+      ADD_STAT(fetchNonSpecCost, "Fetch Cost  in fetch"),
       ADD_STAT(branchMispredicts, statistics::units::Count::get(),
                "The number of times a branch was mispredicted"),
       ADD_STAT(numCommittedDist, statistics::units::Count::get(),
@@ -187,6 +209,14 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
 
     commitSquashedInsts.prereq(commitSquashedInsts);
     commitNonSpecStalls.prereq(commitNonSpecStalls);
+    decodeIdleNonSpecPath.prereq(decodeIdleNonSpecPath);
+    decodeIdleIQEmptyNonSpecPath.prereq(decodeIdleIQEmptyNonSpecPath);
+    decodeIdleNonSpecPathL2Hit.prereq(decodeIdleNonSpecPathL2Hit);
+    decodeIdleNonSpecPathL2Miss.prereq(decodeIdleNonSpecPathL2Miss);
+    fetchNonSpecBranchResteerCost.prereq(fetchNonSpecBranchResteerCost);
+    fetchNonSpecResteerCost.prereq(fetchNonSpecResteerCost);
+    fetchNonSpecStallCost.prereq(fetchNonSpecStallCost);
+    fetchNonSpecCost.prereq(fetchNonSpecCost);
     branchMispredicts.prereq(branchMispredicts);
 
     numCommittedDist
@@ -342,6 +372,7 @@ Commit::clearStates(ThreadID tid)
     tcSquash[tid] = false;
     pc[tid].set(0);
     lastCommitedSeqNum[tid] = 0;
+    lastCommitedBrSeqNum[tid] = 0;
     squashAfterInst[tid] = NULL;
 }
 
@@ -538,17 +569,31 @@ Commit::squashAll(ThreadID tid)
     // all instructions of this thread.
     InstSeqNum squashed_inst = rob->isEmpty(tid) ?
         lastCommitedSeqNum[tid] : rob->readHeadInst(tid)->seqNum - 1;
+    InstSeqNum squashed_inst_br = rob->isEmpty(tid) ?
+        lastCommitedBrSeqNum[tid] : rob->readHeadInst(tid)->brSeqNum - 1;
 
     // All younger instructions will be squashed. Set the sequence
     // number as the youngest instruction in the ROB (0 in this case.
     // Hopefully nothing breaks.)
     youngestSeqNum[tid] = lastCommitedSeqNum[tid];
+    //bblSize[tid] = 0;
+    //bblAddr[tid] = 0;
 
     rob->squash(squashed_inst, tid);
     changedROBNumEntries[tid] = true;
 
     // Send back the sequence number of the squashed instruction.
     toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
+    toIEW->commitInfo[tid].doneBrSeqNum = squashed_inst_br;
+    if(!rob->isEmpty(tid)){
+        toIEW->commitInfo[tid].bblSize = rob->readHeadInst(tid)->bblSize;
+        toIEW->commitInfo[tid].bblAddr = rob->readHeadInst(tid)->bblAddr;
+        DPRINTF(Commit, "Squashed head rob inst  bblSize: %d bblAddr: %#x seqNum: %llu\n",
+                rob->readHeadInst(tid)->bblSize,
+                rob->readHeadInst(tid)->bblAddr,
+                rob->readHeadInst(tid)->seqNum);
+
+    }
 
     // Send back the squash signal to tell stages that they should
     // squash.
@@ -608,6 +653,10 @@ Commit::squashFromSquashAfter(ThreadID tid)
     // the squash. It'll try to re-fetch an instruction executing in
     // microcode unless this is set.
     toIEW->commitInfo[tid].squashInst = squashAfterInst[tid];
+    if(squashAfterInst[tid]){
+      squashAfterInst[tid]->squashedFromThisInst = true;
+    }
+
     squashAfterInst[tid] = NULL;
 
     commitStatus[tid] = ROBSquashing;
@@ -623,6 +672,9 @@ Commit::squashAfter(ThreadID tid, const DynInstPtr &head_inst)
     assert(!squashAfterInst[tid] || squashAfterInst[tid] == head_inst);
     commitStatus[tid] = SquashAfterPending;
     squashAfterInst[tid] = head_inst;
+    if(squashAfterInst[tid]){
+      squashAfterInst[tid]->squashedFromThisInst = true;
+    }
 }
 
 void
@@ -806,6 +858,9 @@ Commit::commit()
             assert(!tcSquash[tid]);
             squashFromTrap(tid);
 
+            InstSeqNum squashed_inst = fromIEW->squashedSeqNum[tid];
+            DPRINTF(Commit, "suash from Trap: squashed_inst seq:%llu\n",squashed_inst);
+
             // If the thread is trying to exit (i.e., an exit syscall was
             // executed), this trapSquash was originated by the exit
             // syscall earlier. In this case, schedule an exit event in
@@ -830,6 +885,7 @@ Commit::commit()
             fromIEW->squashedSeqNum[tid] <= youngestSeqNum[tid]) {
 
             if (fromIEW->mispredictInst[tid]) {
+                fromIEW->mispredictInst[tid]->mispred = 'T';
                 DPRINTF(Commit,
                     "[tid:%i] Squashing due to branch mispred "
                     "PC:%#x [sn:%llu]\n",
@@ -852,6 +908,7 @@ Commit::commit()
             // then use one older sequence number.
             InstSeqNum squashed_inst = fromIEW->squashedSeqNum[tid];
 
+            const DynInstPtr &orderViolatedInst  = rob->findInst(tid, squashed_inst);
             if (fromIEW->includeSquashInst[tid]) {
                 squashed_inst--;
             }
@@ -873,10 +930,27 @@ Commit::commit()
 
             toIEW->commitInfo[tid].mispredictInst =
                 fromIEW->mispredictInst[tid];
+	    if(fromIEW->mispredictInst[tid]){
+	        mispredBrInstSeq = fromIEW->mispredictInst[tid]->seqNum;
+                fromIEW->mispredictInst[tid]->mispred = 'T';
+	    }
             toIEW->commitInfo[tid].branchTaken =
                 fromIEW->branchTaken[tid];
             toIEW->commitInfo[tid].squashInst =
                                     rob->findInst(tid, squashed_inst);
+            toIEW->commitInfo[tid].bblSize = orderViolatedInst->bblSize; 
+            toIEW->commitInfo[tid].bblAddr = orderViolatedInst->bblAddr;
+            DPRINTF(Commit, "[tid:%i] SquashInst from ROB %#x\n",
+                    tid,
+                    toIEW->commitInfo[tid].squashInst->pcState().instAddr());
+            toIEW->commitInfo[tid].doneBrSeqNum = toIEW->commitInfo[tid].squashInst->brSeqNum;
+            DPRINTF(Commit, "[tid:%i] SquashInst from ROB %llu\n",
+                    tid,
+                    toIEW->commitInfo[tid].squashInst->brSeqNum);
+            DPRINTF(Commit, "Order Vioalted inst  bblSize: %d bblAddr: %#x seqNum: %llu\n",
+                    orderViolatedInst->bblSize,
+                    orderViolatedInst->bblAddr,
+                    orderViolatedInst->seqNum);
             if (toIEW->commitInfo[tid].mispredictInst) {
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
@@ -1020,6 +1094,16 @@ Commit::commitInsts()
             bool commit_success = commitHead(head_inst, num_committed);
 
             if (commit_success) {
+                //icacheStallCyclesRightPath += head_inst->icacheStallCycles;
+                //if (head_inst->isControl()) {
+                //    toIEW->commitInfo[tid].bblSize.push_back(bblSize[tid]);
+                //    toIEW->commitInfo[tid].bblAddr.push_back(bblAddr[tid]);
+                //    toIEW->commitInfo[tid].doneInst.push_back(head_inst);
+                //    bblSize[tid] = 0;
+                //    bblAddr[tid] = head_inst->nextInstAddr();
+                //}
+                //else
+                //    bblSize[tid]++;
                 ++num_committed;
                 stats.committedInstType[tid][head_inst->opClass()]++;
                 ppCommit->notify(head_inst);
@@ -1045,6 +1129,7 @@ Commit::commitInsts()
 
                 // Set the doneSeqNum to the youngest committed instruction.
                 toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNum;
+                toIEW->commitInfo[tid].doneBrSeqNum = head_inst->brSeqNum;
 
                 if (tid == 0)
                     canHandleInterrupts = !head_inst->isDelayedCommit();
@@ -1070,6 +1155,7 @@ Commit::commitInsts()
 
                 // Keep track of the last sequence number commited
                 lastCommitedSeqNum[tid] = head_inst->seqNum;
+                lastCommitedBrSeqNum[tid] = head_inst->brSeqNum;
 
                 // If this is an instruction that doesn't play nicely with
                 // others squash everything and restart fetch
@@ -1151,6 +1237,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     // If the instruction is not executed yet, then it will need extra
     // handling.  Signal backwards that it should be executed.
     if (!head_inst->isExecuted()) {
+
         // Make sure we are only trying to commit un-executed instructions we
         // think are possible.
         assert(head_inst->isNonSpeculative() || head_inst->isStoreConditional()
@@ -1323,6 +1410,65 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     if (head_inst->isStore() || head_inst->isAtomic())
         committedStores[tid] = true;
 
+    //if (head_inst->idleCycles){
+    //if(prevBranchFetchTick > 0){
+    //    if((head_inst->fetchTick - prevBranchFetchTick) > 500){
+    //        stats.fetchNonSpecBranchResteerCost += ((head_inst->fetchTick - prevBranchFetchTick) - 500);
+    //    }
+    //    prevBranchFetchTick = 0;
+    //}
+    
+    if(isPrevBranch){
+        stats.fetchNonSpecBranchResteerCost += ((head_inst->fetchTick - prevFetchTick)/500);
+    }else{
+        if(head_inst->seqNum != prevSeqNum + 1){
+            stats.fetchNonSpecResteerCost += (head_inst->fetchTick - prevFetchTick)/500;
+	}else if(head_inst->isStalled){
+            stats.fetchNonSpecStallCost += (head_inst->fetchTick - prevFetchTick)/500;
+	}else{
+            stats.fetchNonSpecCost += (head_inst->fetchTick - prevFetchTick)/500;
+	}
+    }
+
+    if(head_inst->isControl()){
+        prevBranchFetchTick = head_inst->fetchTick;
+	isPrevBranch = true;
+    }else{
+        isPrevBranch = false;
+    }
+    prevSeqNum = head_inst->seqNum;
+    prevFetchTick = head_inst->fetchTick;
+
+      //DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c %llu %d\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, mispred, curTick() , head_inst->isControl() ? 'T' : 'F', head_inst->seqNum, head_inst->squashedFromThisInst);
+      DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, head_inst->mispredicted() ? 'T':'F', curTick() , head_inst->isControl() ? 'T' : 'F');
+    if(head_inst->isControl()){
+      DPRINTFR(MispredCommTrace, "%llu 0x%llx %c %c %c\n", instCount, head_inst->instAddr(), head_inst->mispredicted() ? 'T': 'F', head_inst->isBTBMiss ? 'M' : 'H' , head_inst->isIndirectCtrl()? 'I' : 'D');
+    }
+
+    if( !head_inst->isMicroop() || head_inst->isLastMicroop())
+        instCount++;
+
+    if(instCount == cpu->totalSimInsts){
+        // Exit simulation when reached totalSimInsts
+	//Dump Stats before exiting
+
+	for (auto const& tms : cpu->tmsMap){
+	    DPRINTFR(StarvationCounts,"0x%llx %llu %llu %llu\n",
+			    tms.first,
+			    std::get<0>(tms.second),
+			    std::get<1>(tms.second),
+			    std::get<2>(tms.second)
+			    );
+	}
+        PseudoInst::m5exit(thread[tid]->getTC(), 1);
+    }
+    
+    stats.decodeIdleNonSpecPath += head_inst->idleCycles;
+    stats.decodeIdleIQEmptyNonSpecPath += (head_inst->instQOccDecode == 0 ) ? head_inst->idleIQEmptyCycles : 0;  
+    if (head_inst->memlevel == 1)
+        stats.decodeIdleNonSpecPathL2Hit += head_inst->idleCycles;
+    else if (head_inst->memlevel > 1)
+        stats.decodeIdleNonSpecPathL2Miss += head_inst->idleCycles;
     // Return true to indicate that we have committed an instruction.
     return true;
 }

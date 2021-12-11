@@ -32,6 +32,7 @@
 #include "arch/pcstate.hh"
 #include "base/logging.hh"
 #include "base/types.hh"
+#include "cpu/base.hh"
 #include "config/the_isa.hh"
 
 namespace gem5
@@ -46,14 +47,26 @@ class DefaultBTB
     struct BTBEntry
     {
         BTBEntry()
-            : tag(0), target(0), valid(false)
+            : tag(0), staticBranchInst(0), branch(0), bblSize(0), target(0), fallthrough(0), uncond(false), valid(false)
         {}
 
         /** The entry's tag. */
         Addr tag;
 
+        /** The entry's branch. */
+        StaticInstPtr staticBranchInst;
+        TheISA::PCState branch;
+
+        /** Size of the basic block */
+        uint64_t bblSize;
+
         /** The entry's target. */
         TheISA::PCState target;
+
+        /** The entry's fall-through. */
+        TheISA::PCState fallthrough;
+
+        bool uncond;
 
         /** The entry's thread id. */
         ThreadID tid;
@@ -75,11 +88,33 @@ class DefaultBTB
     void reset();
 
     /** Looks up an address in the BTB. Must call valid() first on the address.
+     *  @param inst_PC The address of the basic block to look up.
+     *  @param tid The thread id.
+     *  @return Returns the static branch inst.
+     */
+    int getBblIndex(Addr instPC, ThreadID tid);
+    StaticInstPtr lookupBranchFromIndex(unsigned idx, ThreadID tid);
+    TheISA::PCState lookupBranchPCFromIndex(unsigned idx, ThreadID tid);
+    StaticInstPtr lookupBranch(Addr instPC, ThreadID tid);
+    TheISA::PCState lookupBranchPC(Addr instPC, ThreadID tid);
+
+    uint64_t lookupBblSize(Addr instPC, ThreadID tid);
+
+    /** Looks up an address in the BTB. Must call valid() first on the address.
      *  @param inst_PC The address of the branch to look up.
      *  @param tid The thread id.
      *  @return Returns the target of the branch.
      */
     TheISA::PCState lookup(Addr instPC, ThreadID tid);
+
+    /** Looks up an address in the BTB. Must call valid() first on the address.
+     *  @param inst_PC The address of the basic block to look up.
+     *  @param tid The thread id.
+     *  @return Returns the fall-through of the branch.
+     */
+    TheISA::PCState lookupFT(Addr instPC, ThreadID tid);
+
+    bool type(Addr instPC, ThreadID tid);
 
     /** Checks if a branch is in the BTB.
      *  @param inst_PC The address of the branch to look up.
@@ -95,6 +130,12 @@ class DefaultBTB
      */
     void update(Addr instPC, const TheISA::PCState &targetPC,
                 ThreadID tid);
+
+    // Nayana added
+    void update(Addr instPC, const StaticInstPtr &staticBranchInst, 
+                const TheISA::PCState &branch,
+                const uint64_t bblSize, const TheISA::PCState &target, 
+                const TheISA::PCState &ft, bool uncond, ThreadID tid);
 
   private:
     /** Returns the index into the BTB, based on the branch's PC.

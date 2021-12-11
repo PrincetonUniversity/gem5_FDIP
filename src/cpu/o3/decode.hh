@@ -46,6 +46,7 @@
 #include "base/statistics.hh"
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/dyn_inst_ptr.hh"
+#include "cpu/o3/inst_queue.hh"
 #include "cpu/o3/limits.hh"
 #include "cpu/timebuf.hh"
 
@@ -288,12 +289,18 @@ class Decode
     /** Instruction used for squashing branch (used for MIPS)*/
     DynInstPtr squashInst[MaxThreads];
 
+    uint64_t bblSize[MaxThreads];
+    Addr bblAddr[MaxThreads];
     /** Tells when their is a pending delay slot inst. to send
      *  to rename. If there is, then wait squash after the next
      *  instruction (used for MIPS).
      */
     bool squashAfterDelaySlot[MaxThreads];
 
+    int32_t idleCount[MaxThreads];
+    int32_t idleIQEmptyCount[MaxThreads];
+
+    bool emissaryEnableIQEmpty;
     struct DecodeStats : public statistics::Group
     {
         DecodeStats(CPU *cpu);
@@ -321,6 +328,8 @@ class Decode
         /** Stat for total number of squashed instructions. */
         statistics::Scalar squashedInsts;
     } stats;
+  public:
+    InstructionQueue *instQueue;
 };
 
 } // namespace o3

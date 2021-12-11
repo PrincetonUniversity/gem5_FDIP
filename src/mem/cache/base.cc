@@ -346,6 +346,61 @@ BaseCache::handleTimingReqMiss(PacketPtr pkt, MSHR *mshr, CacheBlk *blk,
     }
 }
 
+bool
+BaseCache::recvTimingWouldHaveStarved(PacketPtr pkt)
+{
+    // cms11 oracle
+    // PacketList writebacks;
+    CacheBlk *blk = tags->findBlock(pkt->getAddr(), pkt->isSecure());
+
+    if (blk) {
+        // cout
+    } else {
+        // cout << miss << endl;
+        return false;
+    }
+
+    //blk->status &= ~BlkDirty;
+    blk->clearCoherenceBits(CacheBlk::DirtyBit);
+
+    invalidateBlock(blk);
+    // evictBlock(blk, writebacks);
+    return true;
+
+}
+
+bool
+BaseCache::recvTimingStarvationReq(PacketPtr pkt)
+{
+    // sanity check
+    assert(pkt->isRequest());
+
+    chatty_assert(!(isReadOnly && pkt->isWrite()),
+                  "Should never see a write in a read-only cache %s\n",
+                  name());
+
+    CacheBlk *blk = tags->findBlock(pkt->getAddr(), pkt->isSecure());
+
+    DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
+            blk ? "hit " + blk->print() : "miss");
+    
+    if (blk) {
+        if (pkt->isStarved()){
+            //blk->coherence |= CacheBlk::BlkStarved;
+            blk->setCoherenceBits(CacheBlk::BlkStarved);
+        }
+        if (pkt->isPreserve()) { 
+            //blk->coherence |= CacheBlk::BlkPreserve;
+            blk->setCoherenceBits(CacheBlk::BlkPreserve);
+        }
+        tags->starveMRU(pkt->getAddr(), pkt->isSecure());
+        delete pkt;
+        return true;
+    } 
+    delete pkt;
+    return false;
+}
+
 void
 BaseCache::recvTimingReq(PacketPtr pkt)
 {
@@ -381,6 +436,14 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         // notify before anything else as later handleTimingReqHit might turn
         // the packet in a response
         ppHit->notify(pkt);
+
+        //EMISSARY: BEGIN
+        if (pkt->isWriteback() && pkt->evictFromL1) {
+            blk->l1AccessCount = pkt->accessCount;
+            blk->starveHistory = (blk->starveHistory << 1) | (pkt->isStarved() ? 1 : 0);
+            blk->starveCount += (pkt->isStarved() ? 1 : 0);
+	    }
+        //EMISSARY: END
 
         if (prefetcher && blk && blk->wasPrefetched()) {
             DPRINTF(Cache, "Hit on prefetch for addr %#x (%s)\n",
@@ -512,6 +575,31 @@ BaseCache::recvTimingResp(PacketPtr pkt)
     }
 
     serviceMSHRTargets(mshr, pkt, blk);
+
+    //EMISSARY: BEGIN
+    mshrQueue.updateMissCost(curCycle());
+    float miss_cost = mshr->missCost();
+    if(blk){
+      if (miss_cost <= 59)
+          blk->miss_cost = 0;
+      else if (miss_cost <= 119)
+          blk->miss_cost = 1;
+      else if (miss_cost <= 179)
+          blk->miss_cost = 2;
+      else if (miss_cost <= 239)
+          blk->miss_cost = 3;
+      else if (miss_cost <= 299)
+          blk->miss_cost = 4;
+      else if (miss_cost <= 359)
+          blk->miss_cost = 5;
+      else if (miss_cost <= 419)
+          blk->miss_cost = 6;
+      else
+          blk->miss_cost = 7;
+
+      blk->recency_stack = 7;
+    }
+    //EMISSARY: END
 
     if (mshr->promoteDeferredTargets()) {
         // avoid later read getting stale data while write miss is
@@ -1077,6 +1165,13 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
             blk->trackLoadLocked(pkt);
         }
 
+
+        //EMISSARY: BEGIN
+        pkt->starveHistory = blk->starveHistory;
+        pkt->accessCount = blk->getRefCount();
+        pkt->starveCount = blk->starveCount;
+        //EMISSARY: END
+
         // all read responses have a data payload
         assert(pkt->hasRespData());
         pkt->setDataFromBlock(blk->data, blkSize);
@@ -1634,6 +1729,16 @@ BaseCache::writebackBlk(CacheBlk *blk)
         new Packet(req, blk->isSet(CacheBlk::DirtyBit) ?
                    MemCmd::WritebackDirty : MemCmd::WritebackClean);
 
+    //EMISSARY: BEGIN
+    if( isReadOnly ){
+        pkt->evictFromL1 = true;
+        pkt->setStarved(blk->isStarved());
+        pkt->tickBlkInserted = blk->getTickInserted();
+        pkt->tickBlkRecentAccess = blk->tickRecentAccess; 
+        pkt->accessCount = blk->getRefCount();
+    }
+    //EMISSARY: END
+    
     DPRINTF(Cache, "Create Writeback %s writable: %d, dirty: %d\n",
         pkt->print(), blk->isSet(CacheBlk::WritableBit),
         blk->isSet(CacheBlk::DirtyBit));
@@ -2461,6 +2566,22 @@ BaseCache::CpuSidePort::recvTimingReq(PacketPtr pkt)
         return true;
     }
     return false;
+}
+
+bool
+BaseCache::CpuSidePort::recvTimingStarvationReq(PacketPtr pkt)
+{
+    assert(pkt->isRequest());
+
+    return cache->recvTimingStarvationReq(pkt);
+}
+
+bool
+BaseCache::CpuSidePort::recvTimingWouldHaveStarved(PacketPtr pkt)
+{
+    assert(pkt->isRequest());
+
+    return cache->recvTimingWouldHaveStarved(pkt);
 }
 
 Tick

@@ -181,6 +181,12 @@ class AddrMapper : public SimObject
         }
 
         bool
+        recvTimingStarvationReq(PacketPtr pkt)
+        {
+            return true;
+        }
+
+        bool
         recvTimingSnoopResp(PacketPtr pkt) override
         {
             return mapper.recvTimingSnoopResp(pkt);

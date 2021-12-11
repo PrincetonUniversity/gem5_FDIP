@@ -68,11 +68,28 @@ class LRURP(BaseReplacementPolicy):
     cxx_class = 'gem5::replacement_policy::LRU'
     cxx_header = "mem/cache/replacement_policies/lru_rp.hh"
 
+class LRUEmissaryRP(BaseReplacementPolicy):
+    type = 'LRUEmissaryRP'
+    cxx_class = 'gem5::replacement_policy::LRUEmissary'
+    cxx_header = "mem/cache/replacement_policies/lru_emissary_rp.hh"
+    lru_ways = Param.Int(Parent.lru_ways, "Number of ways allocated to LRU Mode")
+    preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways allocated to Preserve Mode")
+
+class MLPLINRP(BaseReplacementPolicy):
+    type = 'MLPLINRP'
+    cxx_class = 'gem5::replacement_policy::MLPLIN'
+    cxx_header = "mem/cache/replacement_policies/mlp_lin_rp.hh"
+
 class BIPRP(LRURP):
     type = 'BIPRP'
     cxx_class = 'gem5::replacement_policy::BIP'
     cxx_header = "mem/cache/replacement_policies/bip_rp.hh"
     btp = Param.Percent(3, "Percentage of blocks to be inserted as MRU")
+
+class SBIPRP(LRURP):
+    type = 'SBIPRP'
+    cxx_class = 'gem5::replacement_policy::SBIP'
+    cxx_header = "mem/cache/replacement_policies/sbip_rp.hh"
 
 class LIPRP(BIPRP):
     btp = 0
