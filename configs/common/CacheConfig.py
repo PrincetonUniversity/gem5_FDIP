@@ -133,6 +133,30 @@ def config_cache(options, system):
             icache = icache_class(**_get_cache_opts('l1i', options))
             dcache = dcache_class(**_get_cache_opts('l1d', options))
 
+            if options.l1i_rp:
+                if options.l1i_rp == "LRUEmissary":
+                    icache.replacement_policy = LRUEmissaryRP()
+                elif options.l1i_rp == "LIP":
+                    icache.replacement_policy = LIPRP()
+                elif options.l1i_rp == "BIP":
+                    icache.replacement_policy = BIPRP()
+                    #if options.btp:
+                    icache.replacement_policy.btp = 3 # options.btp
+                elif options.l1i_rp == "SBIP":
+                    icache.replacement_policy = SBIPRP()
+                elif options.l1i_rp == "MLP":
+                    icache.replacement_policy = MLPLINRP()
+                else:
+                    icache.replacement_policy = LRURP()
+            else:
+                icache.replacement_policy = LRURP()
+
+            icache.lru_ways = 2
+            if options.preserve_ways:
+                icache.preserve_ways = options.preserve_ways
+                icache.lru_ways = 8 - int(options.preserve_ways)
+            else:
+                icache.preserve_ways = 6
             # If we have a walker cache specified, instantiate two
             # instances here
             if walk_cache_class:

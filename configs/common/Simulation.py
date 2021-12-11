@@ -480,6 +480,25 @@ def run(options, root, testsys, cpu_class):
             # Add checker cpu if selected
             if options.checker:
                 switch_cpus[i].addCheckerCpu()
+
+            if options.emissary_enable_iq_empty:
+                switch_cpus[i].emissaryEnableIQEmpty = options.emissary_enable_iq_empty
+
+            if options.starveRandomness:
+                switch_cpus[i].starveRandomness = options.starveRandomness
+
+            if options.starveAtleast:
+                switch_cpus[i].starveAtleast = options.starveAtleast
+
+            if options.randomStarve:
+                switch_cpus[i].randomStarve = options.randomStarve
+
+            if options.pureRandom:
+                switch_cpus[i].pureRandom = options.pureRandom
+
+            if options.ftqSize:
+                switch_cpus[i].ftqSize = options.ftqSize
+
             if options.bp_type:
                 bpClass = ObjectList.bp_list.get(options.bp_type)
                 switch_cpus[i].branchPred = bpClass()
@@ -532,7 +551,9 @@ def run(options, root, testsys, cpu_class):
                                       for i in range(np)]
 
     if options.standard_switch:
+        # Nayana changed
         switch_cpus = [TimingSimpleCPU(switched_out=True, cpu_id=(i))
+        #switch_cpus = [DerivO3CPU(switched_out=True, cpu_id=(i))
                        for i in range(np)]
         switch_cpus_1 = [DerivO3CPU(switched_out=True, cpu_id=(i))
                         for i in range(np)]
@@ -575,6 +596,31 @@ def run(options, root, testsys, cpu_class):
             if options.checker:
                 switch_cpus[i].addCheckerCpu()
                 switch_cpus_1[i].addCheckerCpu()
+
+            if options.emissary_enable_iq_empty:
+                switch_cpus[i].emissaryEnableIQEmpty = options.emissary_enable_iq_empty
+                switch_cpus_1[i].emissaryEnableIQEmpty = options.emissary_enable_iq_empty
+                print("switch cpus emissary flags is {}".format(switch_cpus[i]))
+
+            if options.starveRandomness:
+                switch_cpus[i].starveRandomness = options.starveRandomness
+                switch_cpus_1[i].starveRandomness = options.starveRandomness
+
+            if options.starveAtleast:
+                switch_cpus[i].starveAtleast = options.starveAtleast
+                switch_cpus_1[i].starveAtleast = options.starveAtleast
+
+            if options.randomStarve:
+                switch_cpus[i].randomStarve = options.randomStarve
+                switch_cpus_1[i].randomStarve = options.randomStarve
+
+            if options.pureRandom:
+                switch_cpus[i].pureRandom = options.pureRandom
+                switch_cpus_1[i].pureRandom = options.pureRandom
+
+            if options.ftqSize:
+                switch_cpus[i].ftqSize = options.ftqSize
+                switch_cpus_1[i].ftqSize = options.ftqSize
 
         testsys.switch_cpus = switch_cpus
         testsys.switch_cpus_1 = switch_cpus_1

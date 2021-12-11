@@ -228,7 +228,24 @@ for i in range(np):
 
     if args.bp_type:
         bpClass = ObjectList.bp_list.get(args.bp_type)
+
+    if options.starveAtleast:
+        system.cpu[i].starveAtleast = options.starveAtleast
+
+    if options.randomStarve:
+        system.cpu[i].randomStarve = options.randomStarve
+
+    if options.pureRandom:
+        system.cpu[i].pureRandom = options.pureRandom
+
+    if options.ftqSize:
+        system.cpu[i].ftqSize = options.ftqSize
+
+    if options.bp_type:
+        bpClass = ObjectList.bp_list.get(options.bp_type)
         system.cpu[i].branchPred = bpClass()
+        if options.btb_entries:
+            system.cpu[i].branchPred.BTBEntries = options.btb_entries
 
     if args.indirect_bp_type:
         indirectBPClass = \
