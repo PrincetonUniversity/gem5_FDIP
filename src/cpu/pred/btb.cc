@@ -46,6 +46,7 @@ DefaultBTB::DefaultBTB(unsigned _numEntries,
       tagBits(_tagBits),
       // Nayana commented
       //instShiftAmt(_instShiftAmt),
+      instShiftAmt(0),
       log2NumThreads(floorLog2(_num_threads))
 {
     DPRINTF(Fetch, "BTB: Creating BTB object.\n");
