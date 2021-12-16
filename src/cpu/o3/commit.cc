@@ -1448,20 +1448,20 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     if( !head_inst->isMicroop() || head_inst->isLastMicroop())
         instCount++;
 
-    if(instCount == cpu->totalSimInsts){
-        // Exit simulation when reached totalSimInsts
-	//Dump Stats before exiting
+    //if(instCount == cpu->totalSimInsts){
+    //    // Exit simulation when reached totalSimInsts
+	////Dump Stats before exiting
 
-	for (auto const& tms : cpu->tmsMap){
-	    DPRINTFR(StarvationCounts,"0x%llx %llu %llu %llu\n",
-			    tms.first,
-			    std::get<0>(tms.second),
-			    std::get<1>(tms.second),
-			    std::get<2>(tms.second)
-			    );
-	}
-        PseudoInst::m5exit(thread[tid]->getTC(), 1);
-    }
+	//for (auto const& tms : cpu->tmsMap){
+	//    DPRINTFR(StarvationCounts,"0x%llx %llu %llu %llu\n",
+	//		    tms.first,
+	//		    std::get<0>(tms.second),
+	//		    std::get<1>(tms.second),
+	//		    std::get<2>(tms.second)
+	//		    );
+	//}
+    //    PseudoInst::m5exit(thread[tid]->getTC(), 1);
+    //}
     
     stats.decodeIdleNonSpecPath += head_inst->idleCycles;
     stats.decodeIdleIQEmptyNonSpecPath += (head_inst->instQOccDecode == 0 ) ? head_inst->idleIQEmptyCycles : 0;  
