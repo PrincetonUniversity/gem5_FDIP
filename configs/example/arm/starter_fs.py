@@ -47,8 +47,11 @@ import argparse
 
 m5.util.addToPath('../..')
 
+from common import Options
+from common import Simulation
 from common import SysPaths
 from common import ObjectList
+from common import CacheConfig
 from common import MemConfig
 from common.cores.arm import HPI
 
@@ -73,7 +76,11 @@ cpu_types = {
     "hpi" : ( HPI.HPI,
               HPI.HPI_ICache, HPI.HPI_DCache,
               HPI.HPI_WalkCache,
-              HPI.HPI_L2)
+              HPI.HPI_L2),
+    "ooo" : ( O3CPU,
+               devices.L1I, devices.L1D,
+               devices.WalkCache,
+               devices.L2)
 }
 
 def create_cow_image(name):
@@ -91,10 +98,16 @@ def create(args):
         print("Error: Bootscript %s does not exist" % args.script)
         sys.exit(1)
 
-    cpu_class = cpu_types[args.cpu][0]
-    mem_mode = cpu_class.memory_mode()
+    (CPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
+    print(test_mem_mode)
+    #cpu_class = cpu_types[args.cpu][0]
+    #mem_mode = cpu_class.memory_mode()
+    cpu_class = CPUClass
+    mem_mode = test_mem_mode
+    args.cpu = "ooo"
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
-    want_caches = True if mem_mode == "timing" else False
+    #want_caches = True if mem_mode == "timing" else False
+    want_caches = True
 
     system = devices.SimpleSystem(want_caches,
                                   args.mem_size,
@@ -104,6 +117,7 @@ def create(args):
                                       SysPaths.binary(args.kernel)),
                                   readfile=args.script)
 
+    #CacheConfig.config_cache(args, system)
     MemConfig.config_mem(args, system)
 
     system.realview.vio[0].vio=VirtIOBlock(image=create_cow_image(args.disk_image))
@@ -132,7 +146,9 @@ def create(args):
         devices.CpuCluster(system,
                            args.num_cores,
                            args.cpu_freq, "1.0V",
-                           *cpu_types[args.cpu]),
+                           *cpu_types[args.cpu],
+                           l1i_rp=args.l1i_rp,
+                           preserve_ways=args.preserve_ways),
     ]
 
     # Create a cache hierarchy for the cluster. We are assuming that
@@ -218,20 +234,21 @@ def main():
     parser.add_argument("--cpu-freq", type=str, default="4GHz")
     parser.add_argument("--num-cores", type=int, default=1,
                         help="Number of CPU cores")
-    parser.add_argument("--mem-type", default="DDR3_1600_8x8",
-                        choices=ObjectList.mem_list.get_names(),
-                        help = "type of memory to use")
-    parser.add_argument("--mem-channels", type=int, default=1,
-                        help = "number of memory channels")
-    parser.add_argument("--mem-ranks", type=int, default=None,
-                        help = "number of memory ranks per channel")
-    parser.add_argument("--mem-size", action="store", type=str,
-                        default="1GB",
-                        help="Specify the physical memory size")
+    #parser.add_argument("--mem-type", default="DDR3_1600_8x8",
+    #                    choices=ObjectList.mem_list.get_names(),
+    #                    help = "type of memory to use")
+    #parser.add_argument("--mem-channels", type=int, default=1,
+    #                    help = "number of memory channels")
+    #parser.add_argument("--mem-ranks", type=int, default=None,
+    #                    help = "number of memory ranks per channel")
+    #parser.add_argument("--mem-size", action="store", type=str,
+    #                    default="1GB",
+    #                    help="Specify the physical memory size")
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument("--restore", type=str, default=None)
 
 
+    Options.addCommonOptions(parser)
     args = parser.parse_args()
 
     root = Root(full_system=True)

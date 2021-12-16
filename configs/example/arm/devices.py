@@ -106,13 +106,16 @@ class MemBus(SystemXBar):
 
 class CpuCluster(SubSystem):
     def __init__(self, system,  num_cpus, cpu_clock, cpu_voltage,
-                 cpu_type, l1i_type, l1d_type, wcache_type, l2_type):
+                 cpu_type, l1i_type, l1d_type, wcache_type, l2_type,
+                 l1i_rp, preserve_ways):
         super(CpuCluster, self).__init__()
         self._cpu_type = cpu_type
         self._l1i_type = l1i_type
         self._l1d_type = l1d_type
         self._wcache_type = wcache_type
         self._l2_type = l2_type
+        self._l1i_rp = l1i_rp
+        self._preserve_ways = preserve_ways
 
         assert num_cpus > 0
 
@@ -142,6 +145,33 @@ class CpuCluster(SubSystem):
             l1d = None if self._l1d_type is None else self._l1d_type()
             iwc = None if self._wcache_type is None else self._wcache_type()
             dwc = None if self._wcache_type is None else self._wcache_type()
+
+            if self._l1i_rp:
+                if self._l1i_rp == "LRUEmissary":
+                    l1i.replacement_policy = LRUEmissaryRP()
+                elif self._l1i_rp == "LIP":
+                    l1i.replacement_policy = LIPRP()
+                elif self._l1i_rp == "BIP":
+                    l1i.replacement_policy = BIPRP()
+                    #if self.btp:
+                    l1i.replacement_policy.btp = 3 # self.btp
+                elif self._l1i_rp == "SBIP":
+                    l1i.replacement_policy = SBIPRP()
+                elif self._l1i_rp == "MLP":
+                    l1i.replacement_policy = MLPLINRP()
+                else:
+                    l1i.replacement_policy = LRURP()
+            else:
+                l1i.replacement_policy = LRURP()
+
+            l1i.lru_ways = 2
+            if self._preserve_ways:
+                l1i.preserve_ways = self._preserve_ways
+                l1i.lru_ways = 8 - int(self._preserve_ways)
+            else:
+                l1i.preserve_ways = 6
+
+            print("adding L1 Caches")
             cpu.addPrivateSplitL1Caches(l1i, l1d, iwc, dwc)
 
     def addL2(self, clk_domain):
@@ -152,6 +182,7 @@ class CpuCluster(SubSystem):
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
         self.toL2Bus.mem_side_ports = self.l2.cpu_side
+        print("after addL2")
 
     def addPMUs(self, ints, events=[]):
         """
