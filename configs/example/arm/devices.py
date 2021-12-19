@@ -148,6 +148,9 @@ class CpuCluster(SubSystem):
             if args.totalSimInsts:
                 cpu.totalSimInsts = args.totalSimInsts
 
+            if args.maxinsts:
+                cpu.max_insts_any_thread = args.maxinsts
+
             if args.bp_type:
                 bpClass = ObjectList.bp_list.get(args.bp_type)
                 cpu.branchPred = bpClass()
