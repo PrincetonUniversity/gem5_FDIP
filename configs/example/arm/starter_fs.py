@@ -98,16 +98,21 @@ def create(args):
         print("Error: Bootscript %s does not exist" % args.script)
         sys.exit(1)
 
-    (CPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
-    print(test_mem_mode)
-    #cpu_class = cpu_types[args.cpu][0]
-    #mem_mode = cpu_class.memory_mode()
-    cpu_class = CPUClass
-    mem_mode = test_mem_mode
-    args.cpu = "ooo"
+    want_caches = False
+    if args.cpu_type == "O3CPU":
+        (CPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
+        print(test_mem_mode)
+        cpu_class = CPUClass
+        mem_mode = test_mem_mode
+        args.cpu = "ooo"
+        want_caches = True
+    else:
+        cpu_class = cpu_types[args.cpu][0]
+        mem_mode = cpu_class.memory_mode()
+        want_caches = True if mem_mode == "timing" else False
+
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
-    #want_caches = True if mem_mode == "timing" else False
-    want_caches = True
+    #want_caches = True
 
     system = devices.SimpleSystem(want_caches,
                                   args.mem_size,
@@ -148,7 +153,8 @@ def create(args):
                            args.cpu_freq, "1.0V",
                            *cpu_types[args.cpu],
                            l1i_rp=args.l1i_rp,
-                           preserve_ways=args.preserve_ways),
+                           preserve_ways=args.preserve_ways,
+                           args=args),
     ]
 
     # Create a cache hierarchy for the cluster. We are assuming that

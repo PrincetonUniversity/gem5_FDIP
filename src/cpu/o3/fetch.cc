@@ -881,8 +881,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     }
 
     if (inst->isDirectCtrl() && bblAddr[tid] != 0) {
-        DPRINTF(Bgodala, "BBLInsert Inserting bblAddr[tid]: %#x instAddr: %#x bblSize: %d diff: %d\n",
-                bblAddr[tid], inst->pcState().instAddr(), bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
+        DPRINTF(Bgodala, "BBLInsert Inserting bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
+                bblAddr[tid], inst->pcState().instAddr(), inst->branchTarget(), bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
         assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
         branchPred->BTBUpdate(bblAddr[tid],
                               inst->staticInst,

@@ -45,24 +45,24 @@ have_kvm = "ArmV8KvmCPU" in ObjectList.cpu_list.get_names()
 have_fastmodel = "FastModelCortexA76" in ObjectList.cpu_list.get_names()
 
 class L1I(L1_ICache):
-    tag_latency = 1
-    data_latency = 1
-    response_latency = 1
+    tag_latency = 2
+    data_latency = 2
+    response_latency = 2
     mshrs = 4
-    tgts_per_mshr = 8
-    size = '48kB'
-    assoc = 3
+    tgts_per_mshr = 20
+    size = '64kB'
+    assoc = 8
 
 
 class L1D(L1_DCache):
     tag_latency = 2
     data_latency = 2
-    response_latency = 1
-    mshrs = 16
-    tgts_per_mshr = 16
-    size = '32kB'
-    assoc = 2
-    write_buffers = 16
+    response_latency = 2
+    mshrs = 4
+    tgts_per_mshr = 20
+    size = '64kB'
+    assoc = 8
+    #write_buffers = 16
 
 
 class WalkCache(PageTableWalkerCache):
@@ -77,13 +77,13 @@ class WalkCache(PageTableWalkerCache):
 
 
 class L2(L2Cache):
-    tag_latency = 12
-    data_latency = 12
-    response_latency = 5
+    tag_latency = 10
+    data_latency = 10
+    response_latency = 10
     mshrs = 32
     tgts_per_mshr = 8
-    size = '1MB'
-    assoc = 16
+    size = '256kB'
+    assoc = 8
     write_buffers = 8
     clusivity='mostly_excl'
 
@@ -107,7 +107,7 @@ class MemBus(SystemXBar):
 class CpuCluster(SubSystem):
     def __init__(self, system,  num_cpus, cpu_clock, cpu_voltage,
                  cpu_type, l1i_type, l1d_type, wcache_type, l2_type,
-                 l1i_rp, preserve_ways):
+                 l1i_rp, preserve_ways, args):
         super(CpuCluster, self).__init__()
         self._cpu_type = cpu_type
         self._l1i_type = l1i_type
@@ -116,6 +116,7 @@ class CpuCluster(SubSystem):
         self._l2_type = l2_type
         self._l1i_rp = l1i_rp
         self._preserve_ways = preserve_ways
+        self._args = args
 
         assert num_cpus > 0
 
@@ -131,6 +132,29 @@ class CpuCluster(SubSystem):
             cpu.createThreads()
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
+
+            if args.starveAtleast:
+                cpu.starveAtleast = args.starveAtleast
+
+            if args.randomStarve:
+                cpu.randomStarve = args.randomStarve
+
+            if args.pureRandom:
+                cpu.pureRandom = args.pureRandom
+
+            if args.ftqSize:
+                cpu.ftqSize = args.ftqSize
+
+            if args.totalSimInsts:
+                cpu.totalSimInsts = args.totalSimInsts
+
+            if args.bp_type:
+                bpClass = ObjectList.bp_list.get(args.bp_type)
+                cpu.branchPred = bpClass()
+                if args.btb_entries:
+                    cpu.branchPred.BTBEntries = args.btb_entries
+
+
         system.addCpuCluster(self, num_cpus)
 
     def requireCaches(self):
