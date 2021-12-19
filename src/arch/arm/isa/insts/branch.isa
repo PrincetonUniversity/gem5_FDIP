@@ -44,9 +44,9 @@ let {{
     # B, BL
     for (mnem, link) in (("b", False), ("bl", True)):
         bCode = '''
-        NPC = (uint32_t)(PC + imm);
+        NPC = (uint64_t)(PC + imm);
         '''
-        br_tgt_code = '''pcs.instNPC((uint32_t)(branchPC.instPC() + imm));'''
+        br_tgt_code = '''pcs.instNPC((uint64_t)(branchPC.instPC() + imm));'''
         instFlags = ["IsDirectControl"]
         if (link):
             bCode += '''
