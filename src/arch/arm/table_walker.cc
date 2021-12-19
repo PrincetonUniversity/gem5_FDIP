@@ -1593,7 +1593,9 @@ TableWalker::memAttrsAArch64(ThreadContext *tc, TlbEntry &te,
                                             : TlbEntry::MemoryType::Device;
             te.outerAttrs   = 0;
             te.innerAttrs   = attr_lo == 0 ? 1 : 3;
+            //BGODALA: HACK
             te.nonCacheable = true;
+            //te.nonCacheable = false;
         } else {
             te.mtype        = TlbEntry::MemoryType::Normal;
             te.outerAttrs   = attr_hi == 1 ? 0 :
@@ -1640,7 +1642,10 @@ TableWalker::memAttrsAArch64(ThreadContext *tc, TlbEntry &te,
         // Cacheability
         te.nonCacheable = false;
         if (te.mtype == TlbEntry::MemoryType::Device) {  // Device memory
+            //BGODALA: HACK
             te.nonCacheable = true;
+            //te.nonCacheable = false;
+
         }
         // Treat write-through memory as uncacheable, this is safe
         // but for performance reasons not optimal.
