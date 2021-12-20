@@ -553,16 +553,16 @@ BPredUnit::update(const InstSeqNum &done_sn, ThreadID tid)
                     predHist[tid].back().target);
 
         if (iPred) {
-            //iPred->commit(done_sn, tid, predHist[tid].back().indirectHistory);
-            if(predHist[tid].back().indirectHistory && predHist[tid].back().wasIndirect && predHist[tid].back().predTaken){
-                iPred->recordTarget(
-                    predHist[tid].back().seqNum, predHist[tid].back().indirectHistory,
-                    predHist[tid].back().target, tid);
-            }
+            //if(predHist[tid].back().indirectHistory && predHist[tid].back().wasIndirect && predHist[tid].back().predTaken){
+            //    iPred->recordTarget(
+            //        predHist[tid].back().seqNum, predHist[tid].back().indirectHistory,
+            //        predHist[tid].back().target, tid);
+            //}
             if(predHist[tid].back().indirectHistory){
                 iPred->commit(done_sn, tid, predHist[tid].back().indirectHistory);
                 predHist[tid].back().indirectHistory = NULL;
             }
+            iPred->commit(done_sn, tid, predHist[tid].back().indirectHistory);
         }
 
         delete prev_hist;
@@ -723,11 +723,11 @@ BPredUnit::squash(const InstSeqNum &squashed_sn,
             }
             if (hist_it->wasIndirect) {
                 ++stats.indirectMispredicted;
-                //if (iPred) {
-                //    iPred->recordTarget(
-                //        hist_it->seqNum, pred_hist.front().indirectHistory,
-                //        corrTarget, tid);
-                //}
+                if (iPred) {
+                    iPred->recordTarget(
+                        hist_it->seqNum, pred_hist.front().indirectHistory,
+                        corrTarget, tid);
+                }
             } else {
                 DPRINTF(Branch,"[tid:%i] [squash sn:%llu] "
                         "BTB Update called for [sn:%llu] "
@@ -859,11 +859,11 @@ BPredUnit::squash(const InstSeqNum &squashed_sn,
             }
             if (hist_it->wasIndirect) {
                 ++stats.indirectMispredicted;
-                //if (iPred) {
-                //    iPred->recordTarget(
-                //        hist_it->seqNum, pred_hist.front().indirectHistory,
-                //        corrTarget, tid);
-                //}
+                if (iPred) {
+                    iPred->recordTarget(
+                        hist_it->seqNum, pred_hist.front().indirectHistory,
+                        corrTarget, tid);
+                }
             } else {
                 DPRINTF(Branch,"[tid:%i] [squash sn:%llu] "
                         "BTB Update called for [sn:%llu] "
