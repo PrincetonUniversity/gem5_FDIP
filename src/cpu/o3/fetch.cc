@@ -1012,10 +1012,6 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     // Initiate translation of the icache block
     if(add_front)
         fetchStatus[tid] = ItlbWait;
-    FetchTranslation *trans = new FetchTranslation(this);
-    cpu->mmu->translateTiming(mem_req, cpu->thread[tid]->getTC(),
-                              trans, BaseMMU::Execute);
-
     //TODO: Add check to not send multiple requests for the same
     //address
     if (add_front) {
@@ -1030,7 +1026,11 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
 
     add_front = false;
 
-    return true;
+    FetchTranslation *trans = new FetchTranslation(this);
+    cpu->mmu->translateTiming(mem_req, cpu->thread[tid]->getTC(),
+                              trans, BaseMMU::Execute);
+
+   return true;
 }
 
 void
@@ -1044,10 +1044,21 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
     // Wake up CPU if it was idle
     cpu->wakeCPU();
 
-    //if (fetchStatus[tid] != ItlbWait || mem_req != memReq[tid] ||
-    if ( memReq[tid].empty() || (mem_req->getVaddr() != ((pc[tid].instAddr() >> 6 ) << 6) &&  (mem_req != memReq[tid].back() ||
-        //mem_req->getVaddr() != memReq[tid]->getVaddr()) {
-        mem_req->getVaddr() != memReq[tid].back()->getVaddr()))) {
+    ////if (fetchStatus[tid] != ItlbWait || mem_req != memReq[tid] ||
+    //if ( memReq[tid].empty() || (mem_req->getVaddr() != ((pc[tid].instAddr() >> 6 ) << 6) &&  (mem_req != memReq[tid].back() ||
+    //    //mem_req->getVaddr() != memReq[tid]->getVaddr()) {
+    //    mem_req->getVaddr() != memReq[tid].back()->getVaddr()))) {
+
+    bool foundPC = false;
+    DPRINTF(Fetch, "fetchBufferPC size is %d\n",fetchBufferPC[tid].size());
+    for ( auto pc_it : fetchBufferPC[tid]){
+        DPRINTF(Fetch, "pc_it: %#x and fetchBufferPC: %#x\n", pc_it, mem_req->getVaddr());
+        if(pc_it == mem_req->getVaddr()){
+            foundPC = true;
+            break;
+        }
+    }
+    if(memReq[tid].empty() || !foundPC){
         DPRINTF(Fetch, "[tid:%i] Ignoring itlb completed after squash vaddr %#x pc[tid:%i] %#x\n",
                 tid, mem_req->getVaddr(), tid, pc[tid].instAddr());
         ++fetchStats.tlbSquashes;
@@ -1100,7 +1111,8 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         // Access the cache.
         if (!icachePort.sendTimingReq(data_pkt)) {
             DPRINTF(Fetch, "SendTimingReq failed\n");
-            if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1)) {
+            //if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1)) {
+            if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC)) {
 
                 if (retryPkt == NULL){
                     assert(retryPkt == NULL);
@@ -1996,13 +2008,7 @@ Fetch::fetch(bool &status_change)
             && !inRom && !macroop[tid]) {
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
-            //if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC) {
-                //for ( auto &buf_it : fetchBuffer[tid]){
-                //    delete &*buf_it;
-                //}
-                fetchBuffer[tid].clear();
-                fetchBufferPC[tid].clear();
-                fetchBufferValid[tid].clear();
+            if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC) {
                 add_front = true;
                 fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
 
@@ -2012,7 +2018,7 @@ Fetch::fetch(bool &status_change)
                     ++fetchStats.tlbCycles;
                 else
                     ++fetchStats.miscStallCycles;
-            //}
+            }
             return;
         } else if (checkInterrupt(thisPC.instAddr()) && !delayedCommit[tid]) {
             // Stall CPU if an interrupt is posted and we're not issuing
@@ -2417,12 +2423,12 @@ Fetch::fetch(bool &status_change)
         fetchBuffer[tid].pop_front();
         fetchBufferValid[tid].pop_front();
         DPRINTF(Fetch, "[tid:%i] Popping queue %d %d %d.\n", tid, fetchBuffer[tid].size(), fetchBufferPC[tid].size(), fetchBufferValid[tid].size());
-        if(fetchBufferPC[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front() && !curMacroop){
-            fetchBufferPC[tid].clear();
-            fetchBuffer[tid].clear();
-            fetchBufferValid[tid].clear();
-            DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
-        }
+        //if(fetchBufferPC[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front() && !curMacroop){
+        //    fetchBufferPC[tid].clear();
+        //    fetchBuffer[tid].clear();
+        //    fetchBufferValid[tid].clear();
+        //    DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+        //}
     }
 }
 
