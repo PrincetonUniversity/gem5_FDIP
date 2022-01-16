@@ -465,7 +465,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     Addr fetchAddr = (thisPC.instAddr() + pcOffset) & decoder[tid]->pcMask();
     Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
 
-    if(fetchStatus[tid] == IcacheWaitResponse && fetchBufferBlockPC == pkt->req->getVaddr()){
+    if((fetchStatus[tid] == IcacheWaitResponse || fetchStatus[tid] == IcacheWaitRetry) && fetchBufferBlockPC == pkt->req->getVaddr()){
         DPRINTF(Fetch, "BGODALA: Wakingup CPU\n");
         cpu->wakeCPU();
         switchToActive();
@@ -1124,6 +1124,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                     retryTid = tid;
                 }
             } else {
+                //FIXME: pop only the request that failed
                 if ( fetchBuffer[tid].size() > 0 ){
                     fetchBufferPC[tid].pop_back();
                     fetchBufferValid[tid].pop_back();
