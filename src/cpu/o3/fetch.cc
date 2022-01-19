@@ -133,6 +133,8 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       prefetchQueueSize(params.fetchQueueSize),
       numThreads(params.numThreads),
       numFetchingThreads(params.smtNumFetchingThreads),
+      enablePerfectICache(params.enablePerfectICache),
+      enableFDIP(params.enableFDIP),
       icachePort(this, _cpu),
       // cms11 oracle
       REPL(params.cache_repl),
@@ -1109,31 +1111,8 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         fetchStats.cacheLines++;
 
         // Access the cache.
-        if (!icachePort.sendTimingReq(data_pkt)) {
-            DPRINTF(Fetch, "SendTimingReq failed\n");
-            //if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1)) {
-            if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC)) {
-
-                if (retryPkt == NULL){
-                    assert(retryPkt == NULL);
-                    assert(retryTid == InvalidThreadID);
-                    DPRINTF(Fetch, "[tid:%i] Out of MSHRs!\n", tid);
-
-                    fetchStatus[tid] = IcacheWaitRetry;
-                    retryPkt = data_pkt;
-                    retryTid = tid;
-                }
-            } else {
-                //FIXME: pop only the request that failed
-                if ( fetchBuffer[tid].size() > 0 ){
-                    fetchBufferPC[tid].pop_back();
-                    fetchBufferValid[tid].pop_back();
-                    //delete fetchBuffer[tid].back();
-                    fetchBuffer[tid].pop_back();
-                }
-            }
-            cacheBlocked = true;
-        } else {
+        if(enablePerfectICache){
+            icachePort.sendFunctional(data_pkt);
             DPRINTF(Fetch, "[tid:%i] Doing Icache access.\n", tid);
             DPRINTF(Activity, "[tid:%i] Activity: Waiting on I-cache "
                     "response.\n", tid);
@@ -1145,6 +1124,45 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             // Notify Fetch Request probe when a packet containing a fetch
             // request is successfully sent
             ppFetchRequestSent->notify(mem_req);
+            processCacheCompletion(data_pkt);
+        }else{
+            if (!icachePort.sendTimingReq(data_pkt)) {
+                DPRINTF(Fetch, "SendTimingReq failed\n");
+                //if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1)) {
+                if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC)) {
+
+                    if (retryPkt == NULL){
+                        assert(retryPkt == NULL);
+                        assert(retryTid == InvalidThreadID);
+                        DPRINTF(Fetch, "[tid:%i] Out of MSHRs!\n", tid);
+
+                        fetchStatus[tid] = IcacheWaitRetry;
+                        retryPkt = data_pkt;
+                        retryTid = tid;
+                    }
+                } else {
+                    //FIXME: pop only the request that failed
+                    if ( fetchBuffer[tid].size() > 0 ){
+                        fetchBufferPC[tid].pop_back();
+                        fetchBufferValid[tid].pop_back();
+                        //delete fetchBuffer[tid].back();
+                        fetchBuffer[tid].pop_back();
+                    }
+                }
+                cacheBlocked = true;
+            } else {
+                DPRINTF(Fetch, "[tid:%i] Doing Icache access.\n", tid);
+                DPRINTF(Activity, "[tid:%i] Activity: Waiting on I-cache "
+                        "response.\n", tid);
+                lastIcacheStall[tid] = curTick();
+                // cms11
+                memsent_ticks[tid][(mem_req->getVaddr())>>6] = curTick();
+                if(add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1))
+                    fetchStatus[tid] = IcacheWaitResponse;
+                // Notify Fetch Request probe when a packet containing a fetch
+                // request is successfully sent
+                ppFetchRequestSent->notify(mem_req);
+            }
         }
     } else {
         
@@ -1437,7 +1455,9 @@ Fetch::tick()
     for (threadFetched = 0; threadFetched < numFetchingThreads;
          threadFetched++) {
         // Fetch each of the actively fetching threads.
-        addToFTQ();
+        if(enableFDIP){
+            addToFTQ();
+        }
         fetch(status_change);
         if (prefetchQueue[0].size()==0)
             prefPC[0] = pc[0];

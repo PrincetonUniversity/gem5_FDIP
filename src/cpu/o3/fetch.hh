@@ -546,6 +546,12 @@ class Fetch
     /** Number of threads that are actively fetching. */
     ThreadID numFetchingThreads;
 
+    /** Enable perfect ICache **/
+    bool enablePerfectICache;
+
+    /** Enable FDIP **/
+    bool enableFDIP;
+
     /** Thread ID being fetched. */
     ThreadID threadFetched;
 

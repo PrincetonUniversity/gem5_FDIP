@@ -181,6 +181,8 @@ class BaseCPU(ClockedObject):
     pureRandom = Param.Bool(False, "PureRandom")
     ftqSize = Param.Unsigned(5, "Fetch target queue size")
     emissaryEnableIQEmpty = Param.Bool(False, "EMISSARY Set starvation bit only IQ is empty")
+    enablePerfectICache = Param.Bool(False,"Enable perfect I-Cache")
+    enableFDIP = Param.Bool(False, "Enable FDIP")
     # EMISSARY: END
 
     icache_port = RequestPort("Instruction Port")

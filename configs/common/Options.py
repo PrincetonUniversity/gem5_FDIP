@@ -157,6 +157,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--starveRandomness", type=float, default=3.125)
     parser.add_argument("--starveAtleast", type=int, default=0)
     parser.add_argument("--randomStarve", action="store_true", default=False)
+    parser.add_argument("--perfectICache", action="store_true", default=False)
     parser.add_argument("--pureRandom", action="store_true", default=False)
     parser.add_argument("--emissary-enable-iq-empty", action="store_true", default=False)
     parser.add_argument("--ftqSize", type=int, default=5)

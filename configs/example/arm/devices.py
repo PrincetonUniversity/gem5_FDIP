@@ -133,6 +133,9 @@ class CpuCluster(SubSystem):
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
 
+            if args.perfectICache:
+                cpu.enablePerfectICache = args.perfectICache
+
             if args.starveAtleast:
                 cpu.starveAtleast = args.starveAtleast
 
