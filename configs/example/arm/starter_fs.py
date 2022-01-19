@@ -60,7 +60,7 @@ import devices
 
 default_kernel = 'vmlinux.arm64'
 default_disk = 'linaro-minimal-aarch64.img'
-default_root_device = '/dev/vda1'
+default_root_device = '/dev/vda'
 
 
 # Pre-defined CPU configurations. Each tuple must be ordered as : (cpu_class,

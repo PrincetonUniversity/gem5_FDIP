@@ -510,8 +510,11 @@ class PL031(AmbaIntDevice):
             0x1000, [ self.interrupt ])
 
         node.appendCompatible(["arm,pl031", "arm,primecell"])
-        clock = state.phandle(self.clk_domain.unproxy(self))
-        node.append(FdtPropertyWords("clocks", clock))
+        realview = self._parent.unproxy(self)
+        node.append(FdtPropertyWords("clocks",
+            [state.phandle(realview.fixed_clock24MHz)]))
+        #clock = state.phandle(self.clk_domain.unproxy(self))
+        #node.append(FdtPropertyWords("clocks", clock))
         node.append(FdtPropertyStrings("clock-names", ["apb_pclk"]))
 
         yield node
@@ -1483,6 +1486,7 @@ class QEMU_Virt(RealView):
     #flash1 = CfiMemory(range=AddrRange(0x00000000, 0x8000000),
     #                   conf_table_reported=False)
     uart = Pl011(pio_addr=0x9000000, interrupt=ArmSPI(num=33))
+    rtc = PL031(pio_addr=0x9010000, interrupt=ArmSPI(num=34))
     sys_counter = SystemCounter()
     generic_timer = GenericTimer(
         int_phys_s=ArmPPI(num=29, int_type='IRQ_TYPE_LEVEL_HIGH'),
@@ -1501,6 +1505,7 @@ class QEMU_Virt(RealView):
     fixed_clock24MHz = FixedClock(clock="24MHz")
     _off_chip_ranges = [
         AddrRange(0x9000000, 0x9001000),
+        AddrRange(0x9010000, 0x9011000),
         AddrRange(0xa003e00, 0xa003fff),
         AddrRange(0x10000000, 0x3effffff),
         AddrRange(0x4010000000, size='256MiB'),
@@ -1533,6 +1538,7 @@ class QEMU_Virt(RealView):
     def _off_chip_devices(self):
         devices = [
             self.uart,
+            self.rtc,
             #self.realview_io,
             #self.vio[0],
             #self.vio[1],
