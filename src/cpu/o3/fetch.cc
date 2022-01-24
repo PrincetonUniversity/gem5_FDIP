@@ -83,6 +83,9 @@ namespace o3
 // oracle stuff // 32KB / 64B / 8 = 64
 #define SETS 64 // 1MB / 64B / 256 = 64 <-- if change this number, need to change set mask (ind) too
 #define NUM_WAYS 8
+#define CACHE_LINE_SIZE 64 // line size in bytes
+#define CACHE_LISZE_SIZE_WIDTH 6 // number of bits
+#define ICACHE_ACCESS_LATENCY 2 // in cycles
 enum Repl {ORACLE, LRU, RANDOM, NONE};
 //enum Repl REPL = ORACLE; // sets replacement policy
 vector<vector<Addr> > oneMisses[SETS];
@@ -378,6 +381,7 @@ Fetch::clearStates(ThreadID tid)
     prefetchQueueBblSize[tid].clear();
     prefetchQueueSeqNum[tid].clear();
     prefetchQueueBr[tid].clear();
+    prefetchBufferPC[tid].clear();
     // TODO not sure what to do with priorityList for now
     // priorityList.push_back(tid);
 }
@@ -424,6 +428,7 @@ Fetch::resetStage()
         prefetchQueueBblSize[tid].clear();
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
+        prefetchBufferPC[tid].clear();
 
         priorityList.push_back(tid);
     }
@@ -857,6 +862,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             prefetchQueueBblSize[tid].clear();
             prefetchQueueSeqNum[tid].clear();
             prefetchQueueBr[tid].clear();
+            prefetchBufferPC[tid].clear();
             tempPC = nextPC;
             predict_taken = branchPred->predict(inst->staticInst, seq[tid],
                                       bblAddr[tid], tempPC, tid);
@@ -1017,9 +1023,13 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     //TODO: Add check to not send multiple requests for the same
     //address
     if (add_front) {
+        prefetchBufferPC[tid].clear();
+        fetchBufferPC[tid].clear();
+        fetchBufferValid[tid].clear();
         fetchBufferPC[tid].push_front(fetchBufferBlockPC);
         fetchBufferValid[tid].push_front(false);
         fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
+        prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
     } else {
         fetchBufferPC[tid].push_back(fetchBufferBlockPC);
         fetchBufferValid[tid].push_back(false);
@@ -1124,7 +1134,10 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             // Notify Fetch Request probe when a packet containing a fetch
             // request is successfully sent
             ppFetchRequestSent->notify(mem_req);
-            processCacheCompletion(data_pkt);
+            //processCacheCompletion(data_pkt);
+            cpu->schedule(new EventFunctionWrapper(
+              [this,data_pkt]{ 
+              processCacheCompletion(data_pkt);}, "BGODALA"), cpu->clockEdge(Cycles(ICACHE_ACCESS_LATENCY)));
         }else{
             if (!icachePort.sendTimingReq(data_pkt)) {
                 DPRINTF(Fetch, "SendTimingReq failed\n");
@@ -1182,6 +1195,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             prefetchQueueSeqNum[tid].clear();
             prefetchQueueBr[tid].clear();
             fetchStatus[tid] = Running;
+            prefetchBufferPC[tid].clear();
             return;
         }
         add_front = false;
@@ -1269,6 +1283,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         prefetchQueueBblSize[tid].clear();
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
+        prefetchBufferPC[tid].clear();
         DPRINTF(Fetch, "[tid:%i] Squashing, prefetch Queue to size: %d.\n",
             tid, prefetchQueue[tid].size());
     }
@@ -1949,6 +1964,29 @@ Fetch::addToFTQ()
             DPRINTF(Fetch, "[tid:%i] Prefetch queue entry created (%i/%i) %s %s.\n",
                     tid, prefetchQueue[tid].size(), prefetchQueueSize, prefetchQueue[tid].front(), nextPC);
 
+            Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+            Addr branchPCLine = (branchPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+
+            curPCLine  &= decoder[tid]->pcMask();
+            branchPCLine &= decoder[tid]->pcMask();
+
+            //Do not add a line to prefetchBufferPC if the size does not match
+            if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
+                do{
+                    if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                        DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                        prefetchBufferPC[tid].push_back(curPCLine);
+                    }else if(prefetchBufferPC[tid].empty()){
+                        DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                        prefetchBufferPC[tid].push_back(curPCLine);
+                    }
+                    curPCLine += CACHE_LINE_SIZE;
+                    //if(curPCLine > branchPCLine){
+                    //  break;
+                    //}
+                }while(curPCLine <= branchPCLine);
+            }
+            
             // OOO fetch
             Addr fetchAddr = nextPC.instAddr() & decoder[tid]->pcMask();
             Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
@@ -2443,13 +2481,16 @@ Fetch::fetch(bool &status_change)
         fetchBufferPC[tid].pop_front();
         fetchBuffer[tid].pop_front();
         fetchBufferValid[tid].pop_front();
+        if(prefetchBufferPC[tid].size()>0){
+          prefetchBufferPC[tid].pop_front();
+        }
         DPRINTF(Fetch, "[tid:%i] Popping queue %d %d %d.\n", tid, fetchBuffer[tid].size(), fetchBufferPC[tid].size(), fetchBufferValid[tid].size());
-        //if(fetchBufferPC[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front() && !curMacroop){
+        if(fetchBufferPC[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front() && !curMacroop){
         //    fetchBufferPC[tid].clear();
         //    fetchBuffer[tid].clear();
         //    fetchBufferValid[tid].clear();
-        //    DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
-        //}
+            DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+        }
     }
 }
 
@@ -2637,15 +2678,20 @@ void
 Fetch::pipelineIcacheAccesses(ThreadID tid)
 {
     //if (!issuePipelinedIfetch[tid]) {
-    if (fetchStatus[tid] == ItlbWait
-        || fetchStatus[tid] == IcacheWaitResponse
-        || fetchStatus[tid] == IcacheWaitRetry){
+    //if (fetchStatus[tid] == ItlbWait
+    //    || fetchStatus[tid] == IcacheWaitResponse
+    //    || fetchStatus[tid] == IcacheWaitRetry){
+    //    return;
+    //}
+    
+    if(fetchStatus[tid] == IcacheWaitRetry){
         return;
     }
 
     if (prefetchQueue[tid].empty()) {
         return;
     }
+
 
     std::deque<TheISA::PCState>::iterator it = prefetchQueue[tid].begin();
     std::deque<int>::iterator it_sz = prefetchQueueBblSize[tid].begin();
@@ -2660,84 +2706,109 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
         it_sz++;
     }
 
-    it = prefetchQueue[tid].begin();
-    it_sz = prefetchQueueBblSize[tid].begin();
-
-    if (prefetchQueue[tid].size()==1) {
-        Addr prevAddr = prevPC[tid].instAddr();
-        int bblsz = (it_sz!=prefetchQueueBblSize[tid].end()) ? *it_sz : 0;
-        Addr lastAddr = prevAddr + bblsz;
-        if(bblsz>1 && prevAddr>0x10 && (prevAddr>>6)<(lastAddr>>6)) {
-            Addr fetchAddr = (prevAddr+64) & decoder[tid]->pcMask();
-            Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
-            pcIt pc_it = fetchBufferPC[tid].begin();
-            validIt valid_it = fetchBufferValid[tid].begin();
-
-            DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
-                    "starting at PC 20 %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
-            while (pc_it != fetchBufferPC[tid].end() &&
-                   ((*pc_it)!=fetchBufferBlockPC)) {
-                DPRINTF(Fetch, "%#x %#x\n", *pc_it, fetchBufferBlockPC);
-                ++pc_it;
-                ++valid_it;
-            }
-            // Unless buffer already got the block, fetch it from icache.
-            if (pc_it == fetchBufferPC[tid].end()) {
-                DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
-                        "starting at PC %s.\n", tid, prevPC[tid]);
-                fetchCacheLine(fetchBufferBlockPC, tid, prevPC[tid].instAddr());
-                return;
-            }
-        }
-    } 
-    it_sz++;
-    
-    while (it!= prefetchQueue[tid].end()) {
-        // The next PC to access.
-        TheISA::PCState thisPC = *it++;
-        int bblsz = (it_sz!=prefetchQueueBblSize[tid].end()) ? *it_sz++ : 0;
-        Addr lastAddr = thisPC.instAddr() + bblsz;
-
-        Addr fetchAddr = thisPC.instAddr() & decoder[tid]->pcMask();
-        // Align the fetch PC so its at the start of a fetch buffer segment.
-        Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
-        DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access outer, "
-                    "starting at PC %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
-        if (fetchBufferPC[tid].empty()) {
-            DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
-                    "starting at PC %s.\n", tid, thisPC);
-
-            fetchCacheLine(fetchBufferBlockPC, tid, thisPC.instAddr());
-            return;
-        } 
-        int i = 1;
-        do {
-            pcIt pc_it = fetchBufferPC[tid].begin();
-            validIt valid_it = fetchBufferValid[tid].begin();
-
-            DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
-                    "starting at PC 10 %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
-            while (pc_it != fetchBufferPC[tid].end() &&
-                   ((*pc_it)!=fetchBufferBlockPC)) {
-                DPRINTF(Fetch, "%#x %#x %#x\n", *pc_it, fetchBufferBlockPC, lastAddr);
-                ++pc_it;
-                ++valid_it;
-            }
-            // Unless buffer already got the block, fetch it from icache.
-            if (pc_it == fetchBufferPC[tid].end()) {
-                DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
-                        "starting at PC %s.\n", tid, thisPC);
-                fetchCacheLine(fetchBufferBlockPC, tid, thisPC.instAddr());
-                return;
-            }
-            fetchAddr = (thisPC.instAddr()+(i*64)) & decoder[tid]->pcMask(); 
-            i++;
-            fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
-        } while(bblsz>1 && i<3 && (fetchBufferBlockPC>>6)<(lastAddr>>6)); 
-        if((fetchBufferBlockPC>>6)<(lastAddr>>6)) {
-            DPRINTF(Fetch, "Nayana please check me %#x, %#x %s, %d", fetchBufferBlockPC, lastAddr, thisPC, bblsz);
-        }
+    for ( auto pc_it : fetchBufferPC[tid]){
+        DPRINTF(Fetch, "fetchBufferPC %#x\n", pc_it);
     }
+
+    for ( auto pref_pc_it : prefetchBufferPC[tid]){
+        DPRINTF(Fetch, "prefetchBufferPC %#x\n", pref_pc_it);
+    }
+
+    pcIt pc_it = fetchBufferPC[tid].begin();
+    pcIt pref_pc_it = prefetchBufferPC[tid].begin();
+
+    DPRINTF(Fetch, "Iterating through prefetchBufferPC\n");
+    while(pc_it != fetchBufferPC[tid].end() && 
+            pref_pc_it != prefetchBufferPC[tid].end() && 
+            (*pref_pc_it) == (*pc_it)){
+        DPRINTF(Fetch, "%#x\n", *pc_it);
+        pref_pc_it++;
+        pc_it++;
+    }
+
+    if(pref_pc_it != prefetchBufferPC[tid].end()){
+        DPRINTF(Fetch, "Issuing a pipelined access %#x\n", *pref_pc_it); 
+        fetchCacheLine(*pref_pc_it, tid, *pref_pc_it);
+    }
+
+    //it = prefetchQueue[tid].begin();
+    //it_sz = prefetchQueueBblSize[tid].begin();
+
+    //if (prefetchQueue[tid].size()==1) {
+    //    Addr prevAddr = prevPC[tid].instAddr();
+    //    int bblsz = (it_sz!=prefetchQueueBblSize[tid].end()) ? *it_sz : 0;
+    //    Addr lastAddr = prevAddr + bblsz;
+    //    if(bblsz>1 && prevAddr>0x10 && (prevAddr>>6)<(lastAddr>>6)) {
+    //        Addr fetchAddr = (prevAddr+64) & decoder[tid]->pcMask();
+    //        Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+    //        pcIt pc_it = fetchBufferPC[tid].begin();
+    //        validIt valid_it = fetchBufferValid[tid].begin();
+
+    //        DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
+    //                "starting at PC 20 %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
+    //        while (pc_it != fetchBufferPC[tid].end() &&
+    //               ((*pc_it)!=fetchBufferBlockPC)) {
+    //            DPRINTF(Fetch, "%#x %#x\n", *pc_it, fetchBufferBlockPC);
+    //            ++pc_it;
+    //            ++valid_it;
+    //        }
+    //        // Unless buffer already got the block, fetch it from icache.
+    //        if (pc_it == fetchBufferPC[tid].end()) {
+    //            DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
+    //                    "starting at PC %s.\n", tid, prevPC[tid]);
+    //            fetchCacheLine(fetchBufferBlockPC, tid, prevPC[tid].instAddr());
+    //            return;
+    //        }
+    //    }
+    //} 
+    //it_sz++;
+    //
+    //while (it!= prefetchQueue[tid].end()) {
+    //    // The next PC to access.
+    //    TheISA::PCState thisPC = *it++;
+    //    int bblsz = (it_sz!=prefetchQueueBblSize[tid].end()) ? *it_sz++ : 0;
+    //    Addr lastAddr = thisPC.instAddr() + bblsz;
+
+    //    Addr fetchAddr = thisPC.instAddr() & decoder[tid]->pcMask();
+    //    // Align the fetch PC so its at the start of a fetch buffer segment.
+    //    Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+    //    DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access outer, "
+    //                "starting at PC %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
+    //    if (fetchBufferPC[tid].empty()) {
+    //        DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
+    //                "starting at PC %s.\n", tid, thisPC);
+
+    //        fetchCacheLine(fetchBufferBlockPC, tid, thisPC.instAddr());
+    //        return;
+    //    } 
+    //    int i = 1;
+    //    do {
+    //        pcIt pc_it = fetchBufferPC[tid].begin();
+    //        validIt valid_it = fetchBufferValid[tid].begin();
+
+    //        DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
+    //                "starting at PC 10 %d %d %d.\n", tid, fetchBufferPC[tid].size(), fetchBufferValid[tid].size(), bblsz);
+    //        while (pc_it != fetchBufferPC[tid].end() &&
+    //               ((*pc_it)!=fetchBufferBlockPC)) {
+    //            DPRINTF(Fetch, "%#x %#x %#x\n", *pc_it, fetchBufferBlockPC, lastAddr);
+    //            ++pc_it;
+    //            ++valid_it;
+    //        }
+    //        // Unless buffer already got the block, fetch it from icache.
+    //        if (pc_it == fetchBufferPC[tid].end()) {
+    //            DPRINTF(Fetch, "[tid:%i] Issuing a pipelined I-cache access, "
+    //                    "starting at PC %s.\n", tid, thisPC);
+    //            fetchCacheLine(fetchBufferBlockPC, tid, thisPC.instAddr());
+    //            return;
+    //        }
+    //        fetchAddr = (thisPC.instAddr()+(i*64)) & decoder[tid]->pcMask(); 
+    //        i++;
+    //        fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+    //    } while(bblsz>1 && i<3 && (fetchBufferBlockPC>>6)<(lastAddr>>6)); 
+    //    if((fetchBufferBlockPC>>6)<(lastAddr>>6)) {
+    //        DPRINTF(Fetch, "Nayana please check me %#x, %#x %s, %d", fetchBufferBlockPC, lastAddr, thisPC, bblsz);
+    //    }
+    //}
     //// The next PC to access.
     //TheISA::PCState thisPC = pc[tid];
 

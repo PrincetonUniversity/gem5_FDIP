@@ -133,6 +133,9 @@ class CpuCluster(SubSystem):
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
 
+            if args.fdip:
+                cpu.enableFDIP = args.fdip
+
             if args.perfectICache:
                 cpu.enablePerfectICache = args.perfectICache
 

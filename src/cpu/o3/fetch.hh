@@ -515,6 +515,7 @@ class Fetch
     /** The PC of the first instruction loaded into the fetch buffer. */
     //Addr fetchBufferPC[MaxThreads];
     std::list<Addr> fetchBufferPC[MaxThreads];
+    std::list<Addr> prefetchBufferPC[MaxThreads];
     bool add_front;
 
     /** The size of the fetch queue in micro-ops */
