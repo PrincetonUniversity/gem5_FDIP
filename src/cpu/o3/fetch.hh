@@ -508,6 +508,7 @@ class Fetch
     typedef typename std::list<uint8_t*>::iterator bufIt;
     typedef typename std::list<Addr>::iterator pcIt;
     typedef typename std::list<bool>::iterator validIt;
+    typedef typename std::list<RequestPtr>::iterator reqIt;
     /** The fetch data that is being fetched and buffered. */
     //uint8_t *fetchBuffer[MaxThreads];
     std::list<uint8_t*> fetchBuffer[MaxThreads];
@@ -516,6 +517,7 @@ class Fetch
     //Addr fetchBufferPC[MaxThreads];
     std::list<Addr> fetchBufferPC[MaxThreads];
     std::list<Addr> prefetchBufferPC[MaxThreads];
+    std::list<RequestPtr> fetchBufferReqPtr[MaxThreads];
     bool add_front;
 
     /** The size of the fetch queue in micro-ops */

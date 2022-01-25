@@ -180,6 +180,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
         fetchBuffer[i].clear();
         //fetchBufferPC[i] = 0;
         fetchBufferPC[i].clear();
+        fetchBufferReqPtr[i].clear();
         add_front = false;
         //fetchBufferValid[i] = false;
         fetchBufferValid[i].clear();
@@ -374,6 +375,7 @@ Fetch::clearStates(ThreadID tid)
     //fetchBufferValid[tid] = false;
     fetchBuffer[tid].clear();
     fetchBufferPC[tid].clear();
+    fetchBufferReqPtr[tid].clear();
     add_front = false;
     fetchBufferValid[tid].clear();
     fetchQueue[tid].clear();
@@ -420,6 +422,7 @@ Fetch::resetStage()
         //fetchBufferValid[tid] = false;
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
         add_front = false;
         fetchBufferValid[tid].clear();
 
@@ -1025,15 +1028,18 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     if (add_front) {
         prefetchBufferPC[tid].clear();
         fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
         fetchBufferValid[tid].clear();
         fetchBufferPC[tid].push_front(fetchBufferBlockPC);
         fetchBufferValid[tid].push_front(false);
         fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
         prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        fetchBufferReqPtr[tid].push_front(mem_req);
     } else {
         fetchBufferPC[tid].push_back(fetchBufferBlockPC);
         fetchBufferValid[tid].push_back(false);
         fetchBuffer[tid].push_back(new uint8_t[fetchBufferSize]);
+        fetchBufferReqPtr[tid].push_back(mem_req);
     }
 
     add_front = false;
@@ -1063,12 +1069,14 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
 
     bool foundPC = false;
     DPRINTF(Fetch, "fetchBufferPC size is %d\n",fetchBufferPC[tid].size());
+    reqIt mreq_it = fetchBufferReqPtr[tid].begin();
     for ( auto pc_it : fetchBufferPC[tid]){
         DPRINTF(Fetch, "pc_it: %#x and fetchBufferPC: %#x\n", pc_it, mem_req->getVaddr());
-        if(pc_it == mem_req->getVaddr()){
+        if(pc_it == mem_req->getVaddr() && *mreq_it == mem_req){
             foundPC = true;
             break;
         }
+        mreq_it++;
     }
     if(memReq[tid].empty() || !foundPC){
         DPRINTF(Fetch, "[tid:%i] Ignoring itlb completed after squash vaddr %#x pc[tid:%i] %#x\n",
@@ -1142,7 +1150,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             if (!icachePort.sendTimingReq(data_pkt)) {
                 DPRINTF(Fetch, "SendTimingReq failed\n");
                 //if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1)) {
-                if (add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC)) {
+                if (fetchBufferBlockPC==fetchBufferExpectedPC && !fetchBufferReqPtr[tid].empty() && fetchBufferReqPtr[tid].front() == *mreq_it) {
 
                     if (retryPkt == NULL){
                         assert(retryPkt == NULL);
@@ -1155,11 +1163,25 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                     }
                 } else {
                     //FIXME: pop only the request that failed
-                    if ( fetchBuffer[tid].size() > 0 ){
-                        fetchBufferPC[tid].pop_back();
-                        fetchBufferValid[tid].pop_back();
-                        //delete fetchBuffer[tid].back();
-                        fetchBuffer[tid].pop_back();
+                    pcIt pc_it = fetchBufferPC[tid].begin();
+                    validIt val_it = fetchBufferValid[tid].begin();
+                    bufIt buf_it = fetchBuffer[tid].begin();
+                    reqIt req_it = fetchBufferReqPtr[tid].begin();
+
+                    while(req_it != fetchBufferReqPtr[tid].end()){
+
+                        if(*req_it == mem_req) {
+                             DPRINTF(Fetch, "Req failed erasing pkt with pc %#x\n", *pc_it);
+                             fetchBufferPC[tid].erase(pc_it, fetchBufferPC[tid].end());
+                             fetchBufferValid[tid].erase(val_it, fetchBufferValid[tid].end());
+                             fetchBuffer[tid].erase(buf_it, fetchBuffer[tid].end());
+                             fetchBufferReqPtr[tid].erase(req_it, fetchBufferReqPtr[tid].end());
+                             break;
+                        }
+                        pc_it++;
+                        buf_it++;
+                        val_it++;
+                        req_it++;
                     }
                 }
                 cacheBlocked = true;
@@ -1301,6 +1323,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         //}
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
         add_front = false;
         fetchBufferValid[tid].clear();
     } else {
@@ -1310,6 +1333,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         //}
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
         add_front = false;
         fetchBufferValid[tid].clear();
     }
@@ -1494,9 +1518,9 @@ Fetch::tick()
             decodeIdle[i] = false;
         }
         //if (issuePipelinedIfetch[i]) {
-        if(fetchStatus[i] != Squashing) {
+        //if(fetchStatus[i] != Squashing) {
             pipelineIcacheAccesses(i);
-        } 
+        //} 
     }
 
     // Send instructions enqueued into the fetch queue to decode.
@@ -2002,6 +2026,22 @@ Fetch::addToFTQ()
                                        fetchStatus[tid] != ItlbWait &&
                                        fetchStatus[tid] != IcacheWaitRetry &&
                                        fetchStatus[tid] != QuiescePending;
+        } else{
+        
+            DPRINTF(Fetch, "Last line\n");
+            Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+            Addr branchPCLine = curPCLine; 
+
+            curPCLine  &= decoder[tid]->pcMask();
+            branchPCLine &= decoder[tid]->pcMask();
+
+            if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                prefetchBufferPC[tid].push_back(curPCLine);
+            }else if(prefetchBufferPC[tid].empty()){
+                DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                prefetchBufferPC[tid].push_back(curPCLine);
+            }
         }
     }
 }
@@ -2067,7 +2107,7 @@ Fetch::fetch(bool &status_change)
             && !inRom && !macroop[tid]) {
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
-            if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC) {
+            if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC || memReq[tid].empty()) {
                 add_front = true;
                 fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
 
@@ -2088,7 +2128,8 @@ Fetch::fetch(bool &status_change)
             return;
         }
     } else if (fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front()) {
-        DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
+        //DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
+        DPRINTFN("[tid:%i] Nayana added.\n", tid);
 
         fetchStatus[tid] = Running;
         status_change = true;
@@ -2481,6 +2522,7 @@ Fetch::fetch(bool &status_change)
         fetchBufferPC[tid].pop_front();
         fetchBuffer[tid].pop_front();
         fetchBufferValid[tid].pop_front();
+        fetchBufferReqPtr[tid].pop_front();
         if(prefetchBufferPC[tid].size()>0){
           prefetchBufferPC[tid].pop_front();
         }
@@ -2727,6 +2769,9 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     }
 
     if(pref_pc_it != prefetchBufferPC[tid].end()){
+        if(pc_it != fetchBufferPC[tid].end()){
+            DPRINTF(Fetch, "Something is wrong\n");
+        }
         DPRINTF(Fetch, "Issuing a pipelined access %#x\n", *pref_pc_it); 
         fetchCacheLine(*pref_pc_it, tid, *pref_pc_it);
     }
