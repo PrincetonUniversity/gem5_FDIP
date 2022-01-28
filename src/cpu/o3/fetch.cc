@@ -836,6 +836,20 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 //            "predicted to go to %s\n",
 //            tid, inst->seqNum, inst->pcState().instAddr(), nextPC);
 
+    //Pre-decode branch instruction and update BTB
+    if (inst->isDirectCtrl() && bblAddr[tid] != 0) {
+        DPRINTF(Bgodala, "BBLInsert Inserting bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
+                bblAddr[tid], inst->pcState().instAddr(), inst->branchTarget(), bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
+        assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
+        branchPred->BTBUpdate(bblAddr[tid],
+                              inst->staticInst,
+                              inst->pcState(),
+                              bblSize[tid],
+                              inst->branchTarget(),
+                              ftPC,
+                              inst->isUncondCtrl(),
+                              tid);
+    }
     if (!prefetchQueue[tid].empty()) {
         for (auto it = prefetchQueue[tid].cbegin(); it != prefetchQueue[tid].cend(); ++it)
             DPRINTF(Fetch, "%s\n", *it);
@@ -872,7 +886,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             brseq[tid] = seq[tid];
             seq[tid]++;
             prefPC[tid] = tempPC;
-            DPRINTF(Fetch, "Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
+            //DPRINTF(Fetch, "Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
+            DPRINTFN("Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
             //if (prefetchQueue[tid].empty())
             //    TheISA::advancePC(tempPC, inst->staticInst);
             //else {
@@ -932,19 +947,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         ++fetchStats.predictedBranches;
     }
 
-    if (inst->isDirectCtrl() && bblAddr[tid] != 0) {
-        DPRINTF(Bgodala, "BBLInsert Inserting bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
-                bblAddr[tid], inst->pcState().instAddr(), inst->branchTarget(), bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
-        assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
-        branchPred->BTBUpdate(bblAddr[tid],
-                              inst->staticInst,
-                              inst->pcState(),
-                              bblSize[tid],
-                              inst->branchTarget(),
-                              ftPC,
-                              inst->isUncondCtrl(),
-                              tid);
-    }
     inst->setBblSize(bblSize[tid]);
     inst->setBblAddr(bblAddr[tid]);
 
@@ -1026,14 +1028,18 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     //TODO: Add check to not send multiple requests for the same
     //address
     if (add_front) {
-        prefetchBufferPC[tid].clear();
         fetchBufferPC[tid].clear();
         fetchBufferReqPtr[tid].clear();
         fetchBufferValid[tid].clear();
         fetchBufferPC[tid].push_front(fetchBufferBlockPC);
         fetchBufferValid[tid].push_front(false);
         fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
-        prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        if(!prefetchBufferPC[tid].empty() && prefetchBufferPC[tid].front() != fetchBufferBlockPC){
+            prefetchBufferPC[tid].clear();
+            prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        }else if(prefetchBufferPC[tid].empty()){
+            prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        }
         fetchBufferReqPtr[tid].push_front(mem_req);
     } else {
         fetchBufferPC[tid].push_back(fetchBufferBlockPC);
@@ -2531,7 +2537,8 @@ Fetch::fetch(bool &status_change)
         //    fetchBufferPC[tid].clear();
         //    fetchBuffer[tid].clear();
         //    fetchBufferValid[tid].clear();
-            DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+            //DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+            DPRINTFN("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
         }
     }
 }
