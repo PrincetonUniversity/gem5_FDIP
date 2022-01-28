@@ -1468,7 +1468,7 @@ class VExpress_GEM5_Foundation(VExpress_GEM5_Base):
                 cur_sys, boot_loader)
 
 class QEMU_Virt(RealView):
-    _mem_regions = [ AddrRange('1GiB', size='1GiB') ]
+    _mem_regions = [ AddrRange('1GiB', size='8GiB') ]
     pci_host = GenericArmPciHost(
         conf_base=0x4010000000, conf_size='256MiB', conf_device_bits=12,
         pci_pio_base=0x3eff0000,
