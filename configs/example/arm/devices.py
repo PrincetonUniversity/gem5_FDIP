@@ -148,6 +148,9 @@ class CpuCluster(SubSystem):
             if args.pureRandom:
                 cpu.pureRandom = args.pureRandom
 
+            if args.fetchQSize:
+                cpu.fetchQueueSize = args.fetchQSize
+
             if args.ftqSize:
                 cpu.ftqSize = args.ftqSize
 
