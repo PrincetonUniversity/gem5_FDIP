@@ -1152,6 +1152,11 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             cpu->schedule(new EventFunctionWrapper(
               [this,data_pkt]{ 
               processCacheCompletion(data_pkt);}, "BGODALA"), cpu->clockEdge(Cycles(ICACHE_ACCESS_LATENCY)));
+
+            // Send this packet to model bandwidth utilization
+            PacketPtr dummy_data_pkt = new Packet(mem_req, MemCmd::ReadReq);
+            dummy_data_pkt->dataDynamic(new uint8_t[fetchBufferSize]);
+            icachePort.sendTimingReq(dummy_data_pkt);
         }else{
             if (!icachePort.sendTimingReq(data_pkt)) {
                 DPRINTF(Fetch, "SendTimingReq failed\n");
@@ -2939,7 +2944,17 @@ Fetch::IcachePort::recvTimingResp(PacketPtr pkt)
     // We shouldn't ever get a cacheable block in Modified state
     assert(pkt->req->isUncacheable() ||
            !(pkt->cacheResponding() && !pkt->hasSharers()));
-    fetch->processCacheCompletion(pkt);
+    
+    //Do not execute processCacheCompletion when perfect ICache
+    //is enabled. Timing requests are still sent to model
+    //memory bandwidth
+    if(!fetch->enablePerfectICache){
+        fetch->processCacheCompletion(pkt);
+    }else{
+        delete pkt;
+    }
+
+
 
     return true;
 }
