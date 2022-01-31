@@ -168,6 +168,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
     for (int i = 0; i < MaxThreads; i++) {
         fetchStatus[i] = Idle;
         decoder[i] = nullptr;
+        preDecoder[i] = nullptr;
         pc[i] = 0;
         lastinst[i] = 0;
         fetchOffset[i] = 0;
@@ -194,6 +195,8 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
 
     for (ThreadID tid = 0; tid < numThreads; tid++) {
         decoder[tid] = new TheISA::Decoder(
+                dynamic_cast<TheISA::ISA *>(params.isa[tid]));
+        preDecoder[tid] = new TheISA::Decoder(
                 dynamic_cast<TheISA::ISA *>(params.isa[tid]));
         // Create space to buffer the cache line data,
         // which may not hold the entire cache line.
@@ -850,6 +853,23 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
                               inst->isUncondCtrl(),
                               tid);
     }
+    else if (inst->isControl() && bblAddr[tid] != 0) {
+        TheISA::PCState dummyBranchTarget = ftPC;
+        dummyBranchTarget.pc(-1);
+        dummyBranchTarget.npc(-1);
+
+        DPRINTF(Bgodala, "BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
+                bblAddr[tid], inst->pcState().instAddr(), dummyBranchTarget, bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
+        assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
+        branchPred->BTBUpdate(bblAddr[tid],
+                              inst->staticInst,
+                              inst->pcState(),
+                              bblSize[tid],
+                              dummyBranchTarget,
+                              ftPC,
+                              inst->isUncondCtrl(),
+                              tid);
+    }
     if (!prefetchQueue[tid].empty()) {
         for (auto it = prefetchQueue[tid].cbegin(); it != prefetchQueue[tid].cend(); ++it)
             DPRINTF(Fetch, "%s\n", *it);
@@ -952,6 +972,9 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 
     bblAddr[tid] = nextPC.instAddr();
     bblSize[tid] = 0;
+    if (prefetchQueue[0].size()==0){
+        prefPC[0] = nextPC;
+    }
     return predict_taken;
 }
 
@@ -1028,6 +1051,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     //TODO: Add check to not send multiple requests for the same
     //address
     if (add_front) {
+        fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
         fetchBufferReqPtr[tid].clear();
         fetchBufferValid[tid].clear();
@@ -1509,8 +1533,8 @@ Fetch::tick()
             addToFTQ();
         }
         fetch(status_change);
-        if (prefetchQueue[0].size()==0)
-            prefPC[0] = pc[0];
+        //if (prefetchQueue[0].size()==0)
+        //    prefPC[0] = pc[0];
     }
 
     // Record number of instructions fetched this cycle for distribution.
@@ -1947,6 +1971,157 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
     return predictPC;
 }
 
+//Pre decode last line that is pre-fetched
+void
+Fetch::preDecode(){
+    ThreadID tid = 0;
+    TheISA::PCState thisPC = prefPC[tid];
+
+    preDecoder[tid]->reset();
+    Addr fetchAddr = thisPC.instAddr() & decoder[tid]->pcMask();
+    Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+
+    if (branchPred->getBblValid(thisPC.instAddr(), tid))
+        return; 
+    //Check if the buffer has valid last entry
+    //If the line is same as the prefPC line then predcode it and update
+    //BTB
+
+    assert(fetchBufferValid[tid].size() == fetchBufferPC[tid].size() && "Check fetchBufferValid and fetchBufferPC sizes");
+    assert(fetchBufferPC[tid].size() == fetchBuffer[tid].size() && "Check fetchBufferPC and fetchBuffer sizes");
+    if (fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].back() && fetchBufferBlockPC == fetchBufferPC[tid].back()){
+
+        bool inRom = isRomMicroPC(thisPC.microPC());
+        StaticInstPtr curMacroop = NULL; 
+        StaticInstPtr staticInst = NULL; 
+        TheISA::PCState nextPC = thisPC;;
+        int pcOffset = 0;
+
+        unsigned blkOffset = (fetchAddr - fetchBufferBlockPC) / instSize;
+        Addr lastAddr = fetchBufferBlockPC + CACHE_LINE_SIZE;
+        auto *dec_ptr = preDecoder[tid];
+
+        DPRINTF(Fetch, "fetchBufferValid Size: %d fetchBufferPC Size: %d fetchBuffer Size: %d\n",fetchBufferValid[tid].size(),fetchBufferPC[tid].size(),fetchBuffer[tid].size());
+
+        //bufIt buf_it = fetchBuffer[tid].begin();
+        //pcIt pc_it = fetchBufferPC[tid].begin();
+        //validIt valid_it = fetchBufferValid[tid].begin();
+ 
+        //while(pc_it != fetchBufferPC[tid].end()){
+        //    if(*valid_it){
+        //        for(int i=0; i<16; i++){
+        //            unsigned dec_data = 0;
+        //            memcpy(&dec_data,
+        //                    *buf_it + i * instSize, instSize);
+        //            DPRINTF(Fetch, "fetchAddr: %#x data: %#x\n",*pc_it + i*4, dec_data);
+        //        }
+        //        DPRINTF(Fetch,"=================================================\n");
+        //    }
+        //    buf_it++;
+        //    pc_it++;
+        //    valid_it++;
+        //}
+
+        while(fetchAddr < lastAddr){
+            unsigned dec_data = 0;
+            memcpy(&dec_data,
+                    fetchBuffer[tid].back() + blkOffset * instSize, instSize);
+            DPRINTF(Fetch, "predecoder: fetchAddr is %#x fetchBufferBlockPC: %#x prefPC[0]: %#x blkOffset: %d Data: %#x\n", fetchAddr, fetchBufferBlockPC, prefPC[tid].instAddr(), blkOffset, dec_data);
+            bool needMem = !inRom && !curMacroop && !dec_ptr->instReady();
+            fetchAddr = (thisPC.instAddr() + pcOffset) & dec_ptr->pcMask();
+
+            if(needMem){
+                memcpy(dec_ptr->moreBytesPtr(),
+                        fetchBuffer[tid].back() + blkOffset * instSize, instSize);
+                preDecoder[tid]->moreBytes(thisPC, fetchAddr);
+
+                if (dec_ptr->needMoreBytes()) {
+                    blkOffset++;
+                    fetchAddr += instSize;
+                    pcOffset += instSize;
+                }
+            }
+        
+            do {
+                if (!(curMacroop || inRom)) {
+                    if (dec_ptr->instReady()) {
+                        staticInst = dec_ptr->decode(thisPC);
+
+                        if (staticInst->isMacroop()) {
+                            curMacroop = staticInst;
+                        } else {
+                        }
+                    } else {
+                        // We need more bytes for this instruction so blkOffset and
+                        // pcOffset will be updated
+                        break;
+                    }
+                }
+                // Whether we're moving to a new macroop because we're at the
+                // end of the current one, or the branch predictor incorrectly
+                // thinks we are...
+                bool newMacro = false;
+                if (curMacroop || inRom) {
+                    if (inRom) {
+                        staticInst = dec_ptr->fetchRomMicroop(
+                                thisPC.microPC(), curMacroop);
+                    } else {
+                        staticInst = curMacroop->fetchMicroop(thisPC.microPC());
+                    }
+                    newMacro |= staticInst->isLastMicroop();
+                }
+                nextPC = thisPC;
+                staticInst->advancePC(nextPC);
+                newMacro |= thisPC.instAddr() != nextPC.instAddr();
+                inRom = isRomMicroPC(thisPC.microPC());
+
+                if (staticInst->isDirectCtrl()) {
+                    DPRINTF(Bgodala, "PREDECODE BBLInsert Inserting Direct ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
+                            prefPC[tid].instAddr(), thisPC.instAddr(), staticInst->branchTarget(thisPC), thisPC.instAddr() - prefPC[tid].instAddr());
+                    branchPred->BTBUpdate(prefPC[tid].instAddr(),
+                                          staticInst,
+                                          thisPC,
+                                          thisPC.instAddr() - prefPC[tid].instAddr(),
+                                          staticInst->branchTarget(thisPC),
+                                          nextPC,
+                                          staticInst->isUncondCtrl(),
+                                          tid);
+                    return;
+                } else if(staticInst->isControl()){
+                    TheISA::PCState dummyBranchTarget = nextPC;
+                    dummyBranchTarget.pc(-1);
+                    dummyBranchTarget.npc(-1);
+
+                    DPRINTF(Bgodala, "PREDECODE BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
+                            prefPC[tid].instAddr(), thisPC.instAddr(), dummyBranchTarget, thisPC.instAddr() - prefPC[tid].instAddr());
+                    branchPred->BTBUpdate(prefPC[tid].instAddr(),
+                                          staticInst,
+                                          thisPC,
+                                          thisPC.instAddr() - prefPC[tid].instAddr(),
+                                          dummyBranchTarget,
+                                          nextPC,
+                                          staticInst->isUncondCtrl(),
+                                          tid);
+                    return;
+                }
+
+                //Move to next instruction
+                thisPC = nextPC;
+                if (newMacro) {
+                    fetchAddr = thisPC.instAddr() & dec_ptr->pcMask(); 
+                    //blkOffset = (fetchAddr - fetchBufferPC[tid]) / instSize;
+                    blkOffset = (fetchAddr - fetchBufferPC[tid].back()) / instSize;
+                    curMacroop = NULL;
+                    pcOffset = 0;
+                }
+
+
+            } while(curMacroop || dec_ptr->instReady());
+        }
+
+    }
+}
+
 void
 Fetch::addToFTQ()
 {
@@ -1966,7 +2141,7 @@ Fetch::addToFTQ()
     }
 
 
-
+    preDecode();
     // The current Prefetch PC.
     TheISA::PCState thisPC = prefPC[tid];
     TheISA::PCState nextPC = thisPC;
@@ -2138,6 +2313,8 @@ Fetch::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i] Fetch is stalled!\n", tid);
             return;
         }
+    } else if(fetchStatus[tid] == TrapPending){
+        return;
     } else if (fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front()) {
         //DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
         DPRINTFN("[tid:%i] Nayana added.\n", tid);
@@ -2738,7 +2915,8 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //    return;
     //}
     
-    if(fetchStatus[tid] == IcacheWaitRetry){
+    if (fetchStatus[tid] == IcacheWaitRetry
+        || TrapPending){
         return;
     }
 
@@ -2781,9 +2959,10 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     }
 
     if(pref_pc_it != prefetchBufferPC[tid].end()){
-        if(pc_it != fetchBufferPC[tid].end()){
-            DPRINTF(Fetch, "Something is wrong\n");
-        }
+        assert(pc_it == fetchBufferPC[tid].end() && " pc_it is not the end of the fetchBufferPC\n");
+        //if(pc_it != fetchBufferPC[tid].end()){
+        //    DPRINTF(Fetch, "Something is wrong\n");
+        //}
         DPRINTF(Fetch, "Issuing a pipelined access %#x\n", *pref_pc_it); 
         fetchCacheLine(*pref_pc_it, tid, *pref_pc_it);
     }

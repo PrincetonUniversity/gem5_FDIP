@@ -355,6 +355,7 @@ class Fetch
     bool checkSignalsAndUpdate(ThreadID tid);
 
     TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid);
+    void preDecode();
     void addToFTQ();
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
@@ -371,6 +372,7 @@ class Fetch
 
     /** The decoder. */
     TheISA::Decoder *decoder[MaxThreads];
+    TheISA::Decoder *preDecoder[MaxThreads];
 
     RequestPort &getInstPort() { return icachePort; }
 
