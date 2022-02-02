@@ -440,6 +440,10 @@ class Fetch
     StaticInstPtr macroop[MaxThreads];
 
     TheISA::PCState prefPC[MaxThreads];
+    TheISA::PCState lastPrefPC;
+    Addr lastAddrFetched;
+    Addr lastProcessedLine;
+    Addr fallThroughPrefPC;
     Addr bblAddr[MaxThreads];
     uint64_t bblSize[MaxThreads];
 
