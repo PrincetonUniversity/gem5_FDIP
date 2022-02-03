@@ -45,8 +45,8 @@ DefaultBTB::DefaultBTB(unsigned _numEntries,
     : numEntries(_numEntries),
       tagBits(_tagBits),
       // Nayana commented
-      //instShiftAmt(_instShiftAmt),
-      instShiftAmt(0),
+      instShiftAmt(_instShiftAmt),
+      //instShiftAmt(0),
       log2NumThreads(floorLog2(_num_threads))
 {
     DPRINTF(Fetch, "BTB: Creating BTB object.\n");
@@ -63,7 +63,7 @@ DefaultBTB::DefaultBTB(unsigned _numEntries,
 
     idxMask = numEntries - 1;
 
-    tagMask = (1 << tagBits) - 1;
+    tagMask = (1ULL << tagBits) - 1;
 
     tagShiftAmt = instShiftAmt + floorLog2(numEntries);
 }
@@ -90,6 +90,7 @@ inline
 Addr
 DefaultBTB::getTag(Addr instPC)
 {
+    DPRINTF(Fetch, "instPC: %#x BTB Tag: %#x tagShitfAmt: %d tagMask: %#x\n",instPC, (instPC >> tagShiftAmt) & tagMask, tagShiftAmt, tagMask);
     return (instPC >> tagShiftAmt) & tagMask;
 }
 

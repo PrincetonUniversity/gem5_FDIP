@@ -163,7 +163,7 @@ class DefaultBTB
     unsigned tagBits;
 
     /** The tag mask. */
-    unsigned tagMask;
+    Addr tagMask;
 
     /** Number of bits to shift PC when calculating index. */
     unsigned instShiftAmt;

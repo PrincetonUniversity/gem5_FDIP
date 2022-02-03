@@ -785,7 +785,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     // this function updates it.
     //bool predict_taken;
     ThreadID tid = inst->threadNumber;
-    TheISA::PCState ftPC;
+    TheISA::PCState ftPC = nextPC;
     inst->staticInst->advancePC(ftPC);
 
     // The next PC to access.
@@ -864,8 +864,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     }
     else if (inst->isControl() && bblAddr[tid] != 0) {
         TheISA::PCState dummyBranchTarget = ftPC;
-        dummyBranchTarget.pc(-1);
-        dummyBranchTarget.npc(-1);
+        //dummyBranchTarget.pc(-1);
+        //dummyBranchTarget.npc(-1);
 
         DPRINTF(Bgodala, "BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
                 bblAddr[tid], inst->pcState().instAddr(), dummyBranchTarget, bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
@@ -929,6 +929,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             //    branchPC = prefetchQueueBr[tid].front();
             //    prefetchQueueBr[tid].pop_front();
             //}
+            assert(false && "branchpred called from fetch\n");
         }
 
         DPRINTF(Fetch, "[tid:%i] [sn:%llu, %llu] Branch at PC %#x "
@@ -943,6 +944,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
                                       bblAddr[tid], tempPC, tid);
         brseq[tid] = seq[tid];
         seq[tid]++;
+        assert(false && "branchpred called from fetch\n");
     }
 
     if(tempPC.instAddr()<0x10) {
@@ -981,9 +983,9 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 
     bblAddr[tid] = nextPC.instAddr();
     bblSize[tid] = 0;
-    if (prefetchQueue[0].size()==0){
-        prefPC[0] = nextPC;
-    }
+    //if (prefetchQueue[0].size()==0){
+    //    prefPC[0] = nextPC;
+    //}
     return predict_taken;
 }
 
@@ -1938,7 +1940,14 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
         // TODO: Multiple BBLs
         StaticInstPtr staticBranchInst = branchPred->getBranch(prefetchPc.instAddr(), tid);
         branchPC = branchPred->getBranchPC(prefetchPc.instAddr(), tid);
+        
+        if(branchPC.instAddr() < prefetchPc.instAddr()){
+            DPRINTF(Fetch, "Fix this case later\n");
+            return 0;
+        }
+
         TheISA::PCState nextPC=branchPC;
+        DPRINTF(Fetch,"nextPC instAddr is %#x\n",nextPC.instAddr());
         nextPC.npc(nextPC.pc() + nextPC.size());
         //TheISA::advancePC(nextPC, staticBranchInst);
         if(nextPC.npc()%4 != 0){
@@ -1954,6 +1963,14 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
 	    DPRINTF(Bgodala, "Bgodala Staticinst 0x%lx and BranchPC %s\n",staticBranchInst, branchPC);
         bool predict_taken = branchPred->predict(staticBranchInst, seq[tid],
                                       prefetchPc.instAddr(), nextPC, tid);
+
+        if(nextPC.instAddr() < 0x10){
+            nextPC = branchPC;
+            staticBranchInst->advancePC(nextPC);
+            DPRINTFN("Hack: Next pc is %#x\n",nextPC.instAddr());
+
+            //assert(false && "next pc is < 0x10\n");
+        }
 
         DPRINTF(Bgodala, "prefetchPc: 0x%lx branchPC: 0x%lx nextPC: 0x%lx\n", prefetchPc.instAddr(), branchPC.instAddr(), nextPC.instAddr());
         if (predict_taken) {
@@ -2115,11 +2132,12 @@ Fetch::preDecode(){
                                           nextPC,
                                           staticInst->isUncondCtrl(),
                                           tid);
+                    assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
                     bblPC = nextPC;
                 } else if(staticInst->isControl()){
                     TheISA::PCState dummyBranchTarget = nextPC;
-                    dummyBranchTarget.pc(-1);
-                    dummyBranchTarget.npc(-1);
+                    //dummyBranchTarget.pc(-1);
+                    //dummyBranchTarget.npc(-1);
 
                     DPRINTF(Bgodala, "PREDECODE BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
                             bblPC.instAddr(), thisPC.instAddr(), dummyBranchTarget, thisPC.instAddr() - bblPC.instAddr());
@@ -2131,6 +2149,7 @@ Fetch::preDecode(){
                                           nextPC,
                                           staticInst->isUncondCtrl(),
                                           tid);
+                    assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
                     bblPC = nextPC;
                 }
 
@@ -2191,12 +2210,17 @@ Fetch::addToFTQ()
             // Add to the prefetch queue
             prefetchQueue[tid].push_back(nextPC);
             prefetchQueueBblSize[tid].push_back(branchPC.instAddr() - thisPC.instAddr());
+            if (branchPC.instAddr() < thisPC.instAddr()){
+                DPRINTF(Fetch, "should not happen branchPC: %s thisPC: %s\n", branchPC, thisPC);
+                assert(false && "Should not happen\n");
+            }
             //prefetchQueueBblSize[tid].push_back(branchPred->getBblSize(thisPC.instAddr(), tid));
 	        int tempBblSize = branchPred->getBblSize(thisPC.instAddr(), tid);
             if(tempBblSize != (branchPC.instAddr() - thisPC.instAddr())){
 	            DPRINTF(Bgodala, "BGODALA bblSize Mismatch\n");
 	            DPRINTF(Bgodala, "bblSize:%d diff is %d\n",tempBblSize, (branchPC.instAddr() - thisPC.instAddr()));
 	            DPRINTF(Bgodala, "thisPC: %s and branchPC: %s", thisPC, branchPC);
+                assert(false && "Check BTB parameters\n");
 	        }
             if(prefetchQueue[tid].size()==1) {
                 prevPC[tid] = thisPC;
@@ -2214,17 +2238,21 @@ Fetch::addToFTQ()
             branchPCLine &= decoder[tid]->pcMask();
 
             //Do not add a line to prefetchBufferPC if the size does not match
+            DPRINTF(Fetch, "prevPrefPC %#x and fallThroughPrefPC %#x\n",prevPrefPC.instAddr(), fallThroughPrefPC);
+            DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
             if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
                 if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
                     do{
-                        if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
-                            DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                            prefetchBufferPC[tid].push_back(curPCLine);
-                            lastAddrFetched = curPCLine;
-                        }else if(prefetchBufferPC[tid].empty()){
-                            DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                            prefetchBufferPC[tid].push_back(curPCLine);
-                            lastAddrFetched = curPCLine;
+                        if(lastAddrFetched != curPCLine){
+                            if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                                DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                prefetchBufferPC[tid].push_back(curPCLine);
+                                lastAddrFetched = curPCLine;
+                            }else if(prefetchBufferPC[tid].empty()){
+                                DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                prefetchBufferPC[tid].push_back(curPCLine);
+                                lastAddrFetched = curPCLine;
+                            }
                         }
                         curPCLine += CACHE_LINE_SIZE;
                         //if(curPCLine > branchPCLine){
@@ -2252,6 +2280,15 @@ Fetch::addToFTQ()
             fallThroughPrefPC = 0;
             if( branchPC.instAddr() + 4 != nextPC.instAddr()){
                 DPRINTF(Fetch, "Taken branch found in addToFTQ\n");
+                //FIXME: Special case if taken branch is in the same line then pre-decode it again next time
+
+                if (lastProcessedLine == lastAddrFetched && fetchBufferBlockPC == lastProcessedLine && 
+                        branchPCLine == fetchBufferBlockPC){
+                    DPRINTF(Fetch, "When branch target is within the same line\n");
+                    lastPrefPC = prefPC[tid];
+                    lastProcessedLine = 0;
+                    //fallThroughPrefPC = prefPC[tid].instAddr();
+                }
                 break;
             }
             thisPC = nextPC;
@@ -2259,7 +2296,9 @@ Fetch::addToFTQ()
         } else{
         
             //FIXME: prefPC line here and set lastAddrFetched
-            if (lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched){
+            DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched) ||
+                    prefetchBufferPC[tid].empty()){
                 DPRINTF(Fetch, "Last line\n");
                 // if flag is set then use lastAddrFetched else prefPC
                 Addr curPCLine = 0; 
@@ -2269,7 +2308,14 @@ Fetch::addToFTQ()
                 }else{
                     fallThroughPrefPC = prefPC[tid].instAddr();
                     curPCLine = (prefPC[tid].instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+                    //if(lastAddrFetched == prefPC[tid].instAddr()){
+                    //    curPCLine += CACHE_LINE_SIZE;
+                    //    DPRINTF(Fetch, "Already fetched prefPC %#x so fetching next line %#x\n",prefPC[tid].instAddr(),curPCLine);
+                    //}
                     lastPrefPC = prefPC[tid];
+                    
+                    //pre-decode it in case the target of branch lies in the same line
+                    lastProcessedLine = 0;
                 }
                 Addr branchPCLine = curPCLine; 
                 //Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
@@ -2278,18 +2324,20 @@ Fetch::addToFTQ()
                 curPCLine  &= decoder[tid]->pcMask();
                 branchPCLine &= decoder[tid]->pcMask();
 
-                if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
-                    DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                    prefetchBufferPC[tid].push_back(curPCLine);
-                    lastAddrFetched = curPCLine;
-                }else if(prefetchBufferPC[tid].empty()){
-                    DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                    prefetchBufferPC[tid].push_back(curPCLine);
-                    lastAddrFetched = curPCLine;
+                if(lastAddrFetched != curPCLine){
+                    if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                        DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                        prefetchBufferPC[tid].push_back(curPCLine);
+                        lastAddrFetched = curPCLine;
+                    }else if(prefetchBufferPC[tid].empty()){
+                        DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                        prefetchBufferPC[tid].push_back(curPCLine);
+                        lastAddrFetched = curPCLine;
+                    }
                 }
             }
+            break;
         }
-        break;
     }
 
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
