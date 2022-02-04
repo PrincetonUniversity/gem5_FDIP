@@ -2318,6 +2318,13 @@ Fetch::addToFTQ()
         
             //FIXME: prefPC line here and set lastAddrFetched
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            
+            Addr fetchAddr = prefPC[tid].instAddr() & decoder[tid]->pcMask();
+            Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+            if ( lastProcessedLine !=0 && lastProcessedLine != lastAddrFetched && lastAddrFetched == fetchBufferBlockPC){
+                DPRINTF(Fetch, "Get Falthrough next time\n");
+                fallThroughPrefPC = prefPC[tid].instAddr();
+            }
             if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched)){
                 DPRINTF(Fetch, "Last line\n");
                 if(prefetchBufferPC[tid].empty()){
