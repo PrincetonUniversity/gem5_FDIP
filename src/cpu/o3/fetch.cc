@@ -2033,10 +2033,14 @@ Fetch::preDecode(){
             thisPC.npc(fetchBufferPC[tid].back() + 4);
         }
 
+        thisPC.upc(0);
+        thisPC.nupc(1);
+
         Addr fetchAddr = thisPC.instAddr() & decoder[tid]->pcMask();
         Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
         lastProcessedLine = fetchBufferPC[tid].back();
-        bool inRom = isRomMicroPC(thisPC.microPC());
+        //bool inRom = isRomMicroPC(thisPC.microPC());
+        bool inRom = false;
         StaticInstPtr curMacroop = NULL; 
         StaticInstPtr staticInst = NULL; 
         TheISA::PCState nextPC = thisPC;;
@@ -2089,6 +2093,7 @@ Fetch::preDecode(){
             }
         
             do {
+                DPRINTF(Fetch,"PREDECODER: thisPC: %s\n",thisPC);
                 if (!(curMacroop || inRom)) {
                     if (dec_ptr->instReady()) {
                         staticInst = dec_ptr->decode(thisPC);
@@ -2282,14 +2287,30 @@ Fetch::addToFTQ()
                 DPRINTF(Fetch, "Taken branch found in addToFTQ\n");
                 //FIXME: Special case if taken branch is in the same line then pre-decode it again next time
 
-                if (lastProcessedLine == lastAddrFetched && fetchBufferBlockPC == lastProcessedLine && 
-                        branchPCLine == fetchBufferBlockPC){
+                //if (lastProcessedLine == lastAddrFetched && fetchBufferBlockPC == lastProcessedLine && 
+                //        branchPCLine == fetchBufferBlockPC){
+                if (lastAddrFetched == fetchBufferBlockPC){
                     DPRINTF(Fetch, "When branch target is within the same line\n");
                     lastPrefPC = prefPC[tid];
-                    lastProcessedLine = 0;
+
+                    //Process a line again only if it is already processed
+                    //if the line is not yet fetched then do not change lastProcessedLine
+                    if(lastProcessedLine == lastAddrFetched){
+                        lastProcessedLine = 0;
+                    }
                     //fallThroughPrefPC = prefPC[tid].instAddr();
                 }
                 break;
+            }
+            if ( fetchBufferBlockPC == lastAddrFetched){
+                DPRINTF(Fetch, "Branch Not taken\n");
+                DPRINTF(Fetch, "target line same as lastline fetched\n");
+                lastPrefPC = prefPC[tid];
+                ////Process a line again only if it is already processed
+                ////if the line is not yet fetched then do not change lastProcessedLine
+                //if(lastProcessedLine == lastAddrFetched){
+                //    lastProcessedLine = 0;
+                //}
             }
             thisPC = nextPC;
             branchPC = thisPC;
@@ -2297,9 +2318,11 @@ Fetch::addToFTQ()
         
             //FIXME: prefPC line here and set lastAddrFetched
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
-            if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched) ||
-                    prefetchBufferPC[tid].empty()){
+            if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched)){
                 DPRINTF(Fetch, "Last line\n");
+                if(prefetchBufferPC[tid].empty()){
+                    DPRINTFN("PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid]);
+                }
                 // if flag is set then use lastAddrFetched else prefPC
                 Addr curPCLine = 0; 
                 if(fallThroughPrefPC == prefPC[tid].instAddr()){
@@ -2335,6 +2358,10 @@ Fetch::addToFTQ()
                         lastAddrFetched = curPCLine;
                     }
                 }
+                if(prefetchBufferPC[tid].empty()){
+                    DPRINTFN("Corner case found %#x\n", lastAddrFetched);
+                    assert(false && "Corner case found\n");
+                }
             }
             break;
         }
@@ -2343,10 +2370,13 @@ Fetch::addToFTQ()
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
     if (prefetchBufferPC[tid].empty() && memReq[tid].empty()){
         DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+        DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
         Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
         prefetchBufferPC[tid].push_back(curPCLine);
         lastAddrFetched = curPCLine;
+        //lastPrefPC = thisPC;
+        lastPrefPC = prefPC[tid];
     }
 }
 
@@ -2434,8 +2464,7 @@ Fetch::fetch(bool &status_change)
     } else if(fetchStatus[tid] == TrapPending){
         return;
     } else if (fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front()) {
-        //DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
-        DPRINTFN("[tid:%i] Nayana added.\n", tid);
+        DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
 
         fetchStatus[tid] = Running;
         status_change = true;
