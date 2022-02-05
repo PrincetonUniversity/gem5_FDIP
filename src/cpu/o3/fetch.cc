@@ -1964,7 +1964,7 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
         bool predict_taken = branchPred->predict(staticBranchInst, seq[tid],
                                       prefetchPc.instAddr(), nextPC, tid);
 
-        if(nextPC.instAddr() < 0x10){
+        if(nextPC.instAddr() < 0x1000){
             nextPC = branchPC;
             staticBranchInst->advancePC(nextPC);
             DPRINTFN("Hack: Next pc is %#x\n",nextPC.instAddr());
@@ -2329,10 +2329,10 @@ Fetch::addToFTQ()
             
             Addr fetchAddr = prefPC[tid].instAddr() & decoder[tid]->pcMask();
             Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
-            if ( lastProcessedLine !=0 && lastProcessedLine != lastAddrFetched && lastAddrFetched == fetchBufferBlockPC){
-                DPRINTF(Fetch, "Get Falthrough next time\n");
-                fallThroughPrefPC = prefPC[tid].instAddr();
-            }
+            //if ( lastProcessedLine !=0 && lastProcessedLine != lastAddrFetched && lastAddrFetched == fetchBufferBlockPC){
+            //    DPRINTF(Fetch, "Get Falthrough next time\n");
+            //    fallThroughPrefPC = prefPC[tid].instAddr();
+            //}
 
             if(lastProcessedLine == 0 && prefetchBufferPC[tid].empty()){
                 lastProcessedLine = lastAddrFetched;
@@ -2391,7 +2391,7 @@ Fetch::addToFTQ()
     }
 
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
-    if (prefetchBufferPC[tid].empty() && memReq[tid].empty()){
+    if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
         DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
@@ -2400,6 +2400,7 @@ Fetch::addToFTQ()
         lastAddrFetched = curPCLine;
         //lastPrefPC = thisPC;
         lastPrefPC = prefPC[tid];
+        lastProcessedLine = 0;
     }
 }
 
