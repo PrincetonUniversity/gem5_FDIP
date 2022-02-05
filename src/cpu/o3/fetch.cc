@@ -2010,9 +2010,9 @@ Fetch::preDecode(){
     preDecoder[tid]->reset();
 
     // Avoid pre-decoding the same line again
-    if ( lastProcessedLine == lastAddrFetched ){
-        return;
-    }
+    //if ( lastProcessedLine == lastAddrFetched ){
+    //    return;
+    //}
 
     //if (branchPred->getBblValid(thisPC.instAddr(), tid))
     //    return; 
@@ -2245,6 +2245,13 @@ Fetch::addToFTQ()
             //Do not add a line to prefetchBufferPC if the size does not match
             DPRINTF(Fetch, "prevPrefPC %#x and fallThroughPrefPC %#x\n",prevPrefPC.instAddr(), fallThroughPrefPC);
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            
+            //When lastProcessedLine is different from lastAddrFetched
+            if ( lastProcessedLine != lastAddrFetched  ){
+                DPRINTF(Fetch, "setting lastProcessedLine to 0\n");
+                lastProcessedLine = 0;
+            }
+
             if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
                 if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
                     do{
@@ -2314,6 +2321,7 @@ Fetch::addToFTQ()
             }
             thisPC = nextPC;
             branchPC = thisPC;
+            lastProcessedLine = 0;
         } else{
         
             //FIXME: prefPC line here and set lastAddrFetched
@@ -2325,11 +2333,15 @@ Fetch::addToFTQ()
                 DPRINTF(Fetch, "Get Falthrough next time\n");
                 fallThroughPrefPC = prefPC[tid].instAddr();
             }
+
+            if(lastProcessedLine == 0 && prefetchBufferPC[tid].empty()){
+                lastProcessedLine = lastAddrFetched;
+                DPRINTFN("PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid].instAddr());
+                DPRINTF(Fetch, "Fixing lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            }
+
             if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched)){
                 DPRINTF(Fetch, "Last line\n");
-                if(prefetchBufferPC[tid].empty()){
-                    DPRINTFN("PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid]);
-                }
                 // if flag is set then use lastAddrFetched else prefPC
                 Addr curPCLine = 0; 
                 if(fallThroughPrefPC == prefPC[tid].instAddr()){
@@ -2338,6 +2350,10 @@ Fetch::addToFTQ()
                 }else{
                     fallThroughPrefPC = prefPC[tid].instAddr();
                     curPCLine = (prefPC[tid].instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+                    if(prefetchBufferPC[tid].empty() && curPCLine == lastAddrFetched && fetchBufferBlockPC == lastAddrFetched){
+                        curPCLine += CACHE_LINE_SIZE;
+                        DPRINTF(Fetch, "Go to next line if first line is already fetched and prefetchBuffer is empty\n");
+                    }
                     //if(lastAddrFetched == prefPC[tid].instAddr()){
                     //    curPCLine += CACHE_LINE_SIZE;
                     //    DPRINTF(Fetch, "Already fetched prefPC %#x so fetching next line %#x\n",prefPC[tid].instAddr(),curPCLine);
@@ -2345,7 +2361,7 @@ Fetch::addToFTQ()
                     lastPrefPC = prefPC[tid];
                     
                     //pre-decode it in case the target of branch lies in the same line
-                    lastProcessedLine = 0;
+                    //lastProcessedLine = 0;
                 }
                 Addr branchPCLine = curPCLine; 
                 //Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
