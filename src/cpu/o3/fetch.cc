@@ -828,6 +828,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
    
     bool predict_taken;
     TheISA::PCState branchPC, tempPC;
+    bool predictorInvoked = false;
 
     //ThreadID tid = inst->threadNumber;
     //predict_taken = branchPred->predict(inst->staticInst, inst->seqNum,
@@ -929,7 +930,14 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             //    branchPC = prefetchQueueBr[tid].front();
             //    prefetchQueueBr[tid].pop_front();
             //}
-            assert(false && "branchpred called from fetch\n");
+
+            //assert(false && "branchpred called from fetch\n");
+            prefetchBufferPC[tid].clear();
+            fetchBuffer[tid].clear();
+            fetchBufferPC[tid].clear();
+            fetchBufferReqPtr[tid].clear();
+            fetchBufferValid[tid].clear();
+            predictorInvoked = true;
         }
 
         DPRINTF(Fetch, "[tid:%i] [sn:%llu, %llu] Branch at PC %#x "
@@ -944,7 +952,15 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
                                       bblAddr[tid], tempPC, tid);
         brseq[tid] = seq[tid];
         seq[tid]++;
-        assert(false && "branchpred called from fetch\n");
+        //assert(false && "branchpred called from fetch\n");
+
+        prefetchBufferPC[tid].clear();
+        fetchBuffer[tid].clear();
+        fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
+        fetchBufferValid[tid].clear();
+        prefPC[tid] = tempPC;
+        predictorInvoked = true;
     }
 
     if(tempPC.instAddr()<0x10) {
@@ -983,6 +999,12 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 
     bblAddr[tid] = nextPC.instAddr();
     bblSize[tid] = 0;
+
+    if(predictorInvoked){
+        prefPC[tid] = nextPC;
+        warn("VERIFY: Self modifying corner case found!");
+    }
+
     //if (prefetchQueue[0].size()==0){
     //    prefPC[0] = nextPC;
     //}
