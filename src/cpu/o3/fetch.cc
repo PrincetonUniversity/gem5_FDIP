@@ -487,17 +487,17 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     Addr fetchAddr = (thisPC.instAddr() + pcOffset) & decoder[tid]->pcMask();
     Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
 
-    if((fetchStatus[tid] == IcacheWaitResponse || fetchStatus[tid] == IcacheWaitRetry) && fetchBufferBlockPC == pkt->req->getVaddr()){
-        DPRINTF(Fetch, "BGODALA: Wakingup CPU\n");
-        cpu->wakeCPU();
-        switchToActive();
-        // Only switch to IcacheAccessComplete if we're not stalled as well.
-        if (checkStall(tid)) {
-            fetchStatus[tid] = Blocked;
-        } else {
-            fetchStatus[tid] = IcacheAccessComplete;
-        }
-    }
+    //if((fetchStatus[tid] == IcacheWaitResponse || fetchStatus[tid] == IcacheWaitRetry) && fetchBufferBlockPC == pkt->req->getVaddr()){
+    //    DPRINTF(Fetch, "BGODALA: Wakingup CPU\n");
+    //    cpu->wakeCPU();
+    //    switchToActive();
+    //    // Only switch to IcacheAccessComplete if we're not stalled as well.
+    //    if (checkStall(tid)) {
+    //        fetchStatus[tid] = Blocked;
+    //    } else {
+    //        fetchStatus[tid] = IcacheAccessComplete;
+    //    }
+    //}
 
  
     // Only change the status if it's still waiting on the icache access
