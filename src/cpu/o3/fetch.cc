@@ -488,16 +488,17 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
 
     //if((fetchStatus[tid] == IcacheWaitResponse || fetchStatus[tid] == IcacheWaitRetry) && fetchBufferBlockPC == pkt->req->getVaddr()){
-    //    DPRINTF(Fetch, "BGODALA: Wakingup CPU\n");
-    //    cpu->wakeCPU();
-    //    switchToActive();
-    //    // Only switch to IcacheAccessComplete if we're not stalled as well.
-    //    if (checkStall(tid)) {
-    //        fetchStatus[tid] = Blocked;
-    //    } else {
-    //        fetchStatus[tid] = IcacheAccessComplete;
-    //    }
-    //}
+    if((fetchStatus[tid] == IcacheWaitResponse) && fetchBufferBlockPC == pkt->req->getVaddr()){
+        DPRINTF(Fetch, "BGODALA: Wakingup CPU\n");
+        cpu->wakeCPU();
+        switchToActive();
+        // Only switch to IcacheAccessComplete if we're not stalled as well.
+        if (checkStall(tid)) {
+            fetchStatus[tid] = Blocked;
+        } else {
+            fetchStatus[tid] = IcacheAccessComplete;
+        }
+    }
 
  
     // Only change the status if it's still waiting on the icache access
@@ -1003,6 +1004,9 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     if(predictorInvoked){
         prefPC[tid] = nextPC;
         warn("VERIFY: Self modifying corner case found!");
+        lastProcessedLine = 0;
+        lastAddrFetched = 0;
+        fallThroughPrefPC = 0;
     }
 
     //if (prefetchQueue[0].size()==0){
@@ -1991,7 +1995,7 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
             staticBranchInst->advancePC(nextPC);
             DPRINTFN("Hack: Next pc is %#x\n",nextPC.instAddr());
 
-            //assert(false && "next pc is < 0x10\n");
+            //assert(false && "next pc is < 0x1000\n");
         }
 
         DPRINTF(Bgodala, "prefetchPc: 0x%lx branchPC: 0x%lx nextPC: 0x%lx\n", prefetchPc.instAddr(), branchPC.instAddr(), nextPC.instAddr());
@@ -2210,10 +2214,12 @@ Fetch::addToFTQ()
     ThreadID tid = 0;
 
     // Do not prefetch when status is TrapPending
-    if (fetchStatus[tid] == TrapPending ) {
+    if ( fetchStatus[tid] == TrapPending ||
+         fetchStatus[tid] == QuiescePending) {
         issuePipelinedIfetch[tid] = false;
         return;
     }
+
 
     if (prefPC[tid] == 0){
         return;
@@ -2507,7 +2513,7 @@ Fetch::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i] Fetch is stalled!\n", tid);
             return;
         }
-    } else if(fetchStatus[tid] == TrapPending){
+    } else if(fetchStatus[tid] == TrapPending || fetchStatus[tid] == QuiescePending){
         return;
     } else if (fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front()) {
         DPRINTF(Fetch, "[tid:%i] Nayana added.\n", tid);
@@ -3109,7 +3115,8 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //}
     
     if (fetchStatus[tid] == IcacheWaitRetry
-        || fetchStatus[tid] == TrapPending){
+        || fetchStatus[tid] == TrapPending
+        || fetchStatus[tid] == QuiescePending){
         return;
     }
 
