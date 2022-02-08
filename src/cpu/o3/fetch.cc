@@ -2476,7 +2476,7 @@ Fetch::fetch(bool &status_change)
 
         fetchStatus[tid] = Running;
         status_change = true;
-        if(fetchBufferValid[tid].size() > 0 || !fetchBufferValid[tid].front()){
+        if(fetchBufferValid[tid].size() > 0 && !fetchBufferValid[tid].front()){
             return;
         }
     } else if (fetchStatus[tid] == Running) {
@@ -2494,8 +2494,10 @@ Fetch::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
             if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC || memReq[tid].empty()) {
-                //add_front = true;
-                //fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
+                if(!enableFDIP){
+                    add_front = true;
+                    fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
+                }
 
                 if (fetchStatus[tid] == IcacheWaitResponse)
                     ++fetchStats.icacheStallCycles;
@@ -2532,6 +2534,9 @@ Fetch::fetch(bool &status_change)
 
     ++fetchStats.cycles;
 
+    if(!(fetchBufferPC[tid].size() > 0)){
+        return;
+    }
     TheISA::PCState nextPC = thisPC;
 
     StaticInstPtr staticInst = NULL;
@@ -2557,6 +2562,9 @@ Fetch::fetch(bool &status_change)
 
     const unsigned numInsts = fetchBufferSize / instSize;
     //unsigned blkOffset = (fetchAddr - fetchBufferPC[tid]) / instSize;
+    DPRINTF(Fetch, "fetchBufferPC size: %d, fetchBufferValid size: %d, fetchBuffer size: %d\n",
+            fetchBufferPC[tid].size(), fetchBufferValid[tid].size(),fetchBuffer[tid].size());
+    assert(fetchBufferPC[tid].size() > 0 && "fetchBufferPC[tid] size must be > 0\n");
     unsigned blkOffset = (fetchAddr - fetchBufferPC[tid].front()) / instSize;
     
     // cms11 oracle
