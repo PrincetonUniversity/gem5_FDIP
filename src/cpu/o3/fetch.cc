@@ -933,12 +933,14 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             //}
 
             //assert(false && "branchpred called from fetch\n");
-            prefetchBufferPC[tid].clear();
-            fetchBuffer[tid].clear();
-            fetchBufferPC[tid].clear();
-            fetchBufferReqPtr[tid].clear();
-            fetchBufferValid[tid].clear();
-            predictorInvoked = true;
+            if(enableFDIP){
+                prefetchBufferPC[tid].clear();
+                fetchBuffer[tid].clear();
+                fetchBufferPC[tid].clear();
+                fetchBufferReqPtr[tid].clear();
+                fetchBufferValid[tid].clear();
+                predictorInvoked = true;
+            }
         }
 
         DPRINTF(Fetch, "[tid:%i] [sn:%llu, %llu] Branch at PC %#x "
@@ -955,13 +957,15 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         seq[tid]++;
         //assert(false && "branchpred called from fetch\n");
 
-        prefetchBufferPC[tid].clear();
-        fetchBuffer[tid].clear();
-        fetchBufferPC[tid].clear();
-        fetchBufferReqPtr[tid].clear();
-        fetchBufferValid[tid].clear();
-        prefPC[tid] = tempPC;
-        predictorInvoked = true;
+        if(enableFDIP){
+            prefetchBufferPC[tid].clear();
+            fetchBuffer[tid].clear();
+            fetchBufferPC[tid].clear();
+            fetchBufferReqPtr[tid].clear();
+            fetchBufferValid[tid].clear();
+            prefPC[tid] = tempPC;
+            predictorInvoked = true;
+        }
     }
 
     if(tempPC.instAddr()<0x10) {
@@ -1001,7 +1005,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     bblAddr[tid] = nextPC.instAddr();
     bblSize[tid] = 0;
 
-    if(predictorInvoked){
+    if(enableFDIP && predictorInvoked){
         prefPC[tid] = nextPC;
         warn("VERIFY: Self modifying corner case found!");
         lastProcessedLine = 0;
@@ -1087,27 +1091,27 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         fetchStatus[tid] = ItlbWait;
     //TODO: Add check to not send multiple requests for the same
     //address
-    //if (add_front) {
-    //    prefetchQueue[tid].clear();
-    //    prefetchQueueBblSize[tid].clear();
-    //    prefetchQueueSeqNum[tid].clear();
-    //    prefetchQueueBr[tid].clear();
-    //    prefetchBufferPC[tid].clear();
-    //    fetchBuffer[tid].clear();
-    //    fetchBufferPC[tid].clear();
-    //    fetchBufferReqPtr[tid].clear();
-    //    fetchBufferValid[tid].clear();
-    //    fetchBufferPC[tid].push_front(fetchBufferBlockPC);
-    //    fetchBufferValid[tid].push_front(false);
-    //    fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
-    //    prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
-    //    fetchBufferReqPtr[tid].push_front(mem_req);
-    //} else {
+    if (add_front && !enableFDIP) {
+        prefetchQueue[tid].clear();
+        prefetchQueueBblSize[tid].clear();
+        prefetchQueueSeqNum[tid].clear();
+        prefetchQueueBr[tid].clear();
+        prefetchBufferPC[tid].clear();
+        fetchBuffer[tid].clear();
+        fetchBufferPC[tid].clear();
+        fetchBufferReqPtr[tid].clear();
+        fetchBufferValid[tid].clear();
+        fetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        fetchBufferValid[tid].push_front(false);
+        fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
+        prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        fetchBufferReqPtr[tid].push_front(mem_req);
+    } else {
         fetchBufferPC[tid].push_back(fetchBufferBlockPC);
         fetchBufferValid[tid].push_back(false);
         fetchBuffer[tid].push_back(new uint8_t[fetchBufferSize]);
         fetchBufferReqPtr[tid].push_back(mem_req);
-    //}
+    }
 
     add_front = false;
 
@@ -2490,7 +2494,7 @@ Fetch::fetch(bool &status_change)
         //            fetchBufferBlockPC == fetchBufferPC[tid]) && !inRom &&
         //        !macroop[tid]) {
         if (!(fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front())
-            && !inRom && !macroop[tid]) {
+            ) {
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
             if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC || memReq[tid].empty()) {
@@ -2589,10 +2593,11 @@ Fetch::fetch(bool &status_change)
             // If buffer is no longer valid or fetchAddr has moved to point
             // to the next cache block then start fetch from icache.
             //if (!fetchBufferValid[tid] ||
-            if (!fetchBufferValid[tid].front() ||
-                //fetchBufferBlockPC != fetchBufferPC[tid])
-                fetchBufferBlockPC != fetchBufferPC[tid].front())
-                break;
+
+            //if (!fetchBufferValid[tid].front() ||
+            //    //fetchBufferBlockPC != fetchBufferPC[tid])
+            //    fetchBufferBlockPC != fetchBufferPC[tid].front())
+            //    break;
 
             if (blkOffset >= numInsts) {
                 // We need to process more memory, but we've run out of the
@@ -3122,6 +3127,9 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //    return;
     //}
     
+    if(!enableFDIP)
+        return;
+
     if (fetchStatus[tid] == IcacheWaitRetry
         || fetchStatus[tid] == TrapPending
         || fetchStatus[tid] == QuiescePending){
