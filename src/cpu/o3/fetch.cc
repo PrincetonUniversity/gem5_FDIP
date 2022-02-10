@@ -2257,7 +2257,8 @@ Fetch::addToFTQ()
 	            DPRINTF(Bgodala, "BGODALA bblSize Mismatch\n");
 	            DPRINTF(Bgodala, "bblSize:%d diff is %d\n",tempBblSize, (branchPC.instAddr() - thisPC.instAddr()));
 	            DPRINTF(Bgodala, "thisPC: %s and branchPC: %s", thisPC, branchPC);
-                assert(false && "Check BTB parameters\n");
+                return;
+                //assert(false && "Check BTB parameters\n");
 	        }
             if(prefetchQueue[tid].size()==1) {
                 prevPC[tid] = thisPC;
@@ -2496,7 +2497,7 @@ Fetch::fetch(bool &status_change)
         if (!(fetchBufferValid[tid].size()>0 && fetchBufferValid[tid].front() && fetchBufferBlockPC == fetchBufferPC[tid].front())
             ) {
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
-                    "instruction, starting at PC %s.\n", tid, thisPC);
+                    "instruction, starting at PC %s fetchAddr: %#x fetchBufferBlockPC: %#x pcOffset: %d\n", tid, thisPC, fetchAddr, fetchBufferBlockPC, pcOffset);
             if (fetchBufferValid[tid].empty() || fetchBufferPC[tid].front()!=fetchBufferBlockPC || memReq[tid].empty()) {
                 if(!enableFDIP){
                     add_front = true;
@@ -2602,6 +2603,7 @@ Fetch::fetch(bool &status_change)
             if (blkOffset >= numInsts) {
                 // We need to process more memory, but we've run out of the
                 // current block.
+                pcOffset = 0;
                 break;
             }
 
@@ -2885,6 +2887,7 @@ Fetch::fetch(bool &status_change)
         inRom = isRomMicroPC(thisPC.microPC());
     }
 
+    pcOffset = 0;
     if (predictedBranch) {
         DPRINTF(Fetch, "[tid:%i] Done fetching, predicted branch "
                 "instruction encountered.\n", tid);
