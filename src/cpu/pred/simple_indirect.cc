@@ -119,7 +119,7 @@ void
 SimpleIndirectPredictor::recordIndirect(Addr br_addr, Addr tgt_addr,
     InstSeqNum seq_num, ThreadID tid)
 {
-    DPRINTF(Indirect, "Recording %x seq:%d\n", br_addr, seq_num);
+    DPRINTF(Indirect, "Recording %x seq:%d target:%#x\n", br_addr, seq_num, tgt_addr);
     HistoryEntry entry(br_addr, tgt_addr, seq_num);
     threadInfo[tid].pathHist.push_back(entry);
 }
@@ -244,7 +244,7 @@ SimpleIndirectPredictor::getSetIndex(Addr br_addr, unsigned ghr, ThreadID tid)
 inline Addr
 SimpleIndirectPredictor::getTag(Addr br_addr)
 {
-    return (br_addr >> instShift) & ((0x1<<tagBits)-1);
+    return (br_addr >> instShift) & ((0x1ULL<<tagBits)-1);
 }
 
 } // namespace branch_prediction

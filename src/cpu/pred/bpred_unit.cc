@@ -481,6 +481,10 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                 if (iPred->lookup(pc.instAddr(), target, tid)) {
                     // Indirect predictor hit
                     ++stats.indirectHits;
+                    TheISA::PCState indirectBrTarget = pc;
+                    indirectBrTarget.pc(target.pc());
+                    indirectBrTarget.pc(target.npc());
+                    target = indirectBrTarget;
                     DPRINTF(Branch,
                             "[tid:%i] [sn:%llu] "
                             "Instruction %s predicted "
@@ -553,11 +557,19 @@ BPredUnit::update(const InstSeqNum &done_sn, ThreadID tid)
                     predHist[tid].back().target);
 
         if (iPred) {
-            //if(predHist[tid].back().indirectHistory && predHist[tid].back().wasIndirect && predHist[tid].back().predTaken){
-            //    iPred->recordTarget(
-            //        predHist[tid].back().seqNum, predHist[tid].back().indirectHistory,
-            //        predHist[tid].back().target, tid);
-            //}
+            if(predHist[tid].back().indirectHistory && predHist[tid].back().wasIndirect && predHist[tid].back().predTaken){
+                TheISA::PCState branchTarget;
+                branchTarget.set(0);
+                branchTarget.pc(predHist[tid].back().target);
+                branchTarget.npc(predHist[tid].back().target + 4);
+                branchTarget.upc(0);
+                branchTarget.nupc(1);
+                iPred->recordTarget(
+                    predHist[tid].back().seqNum, predHist[tid].back().indirectHistory,
+                    branchTarget, tid);
+                DPRINTF(Branch,"Commit: recording indirect target for pc: %#x and target: %s\n",
+                        predHist[tid].back().pc, branchTarget);
+            }
             if(predHist[tid].back().indirectHistory){
                 iPred->commit(done_sn, tid, predHist[tid].back().indirectHistory);
                 predHist[tid].back().indirectHistory = NULL;
