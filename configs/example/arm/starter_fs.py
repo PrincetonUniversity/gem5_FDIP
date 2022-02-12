@@ -194,11 +194,37 @@ def create(args):
 
     return system
 
+def parse_stats():
+    stats_file = os.path.join(m5.options.outdir,'stats.txt')
+    stats_file_handle = open(stats_file,'r')
+    found = False
+    for line in stats_file_handle:
+        if "simInsts" in line:
+            toks = line.split()
+            instCount = int(toks[1])
+            print(toks)
+            print(instCount)
+            if(instCount >= 5000000):
+                found = True
+                break
+    stats_file_handle.close()
+    #os.remove(stats_file)
+    #with open(stats_file,'w') as fp:
+    #    pass
+    return found
 
 def run(args):
     cptdir = m5.options.outdir
     if args.checkpoint:
         print("Checkpoint directory: %s" % cptdir)
+
+    #while True:
+    #    event = m5.simulate(250000000)
+    #    m5.stats.dump()
+    #    if(parse_stats()):
+    #        break
+
+    #m5.stats.reset()
 
     while True:
         event = m5.simulate()
@@ -237,7 +263,7 @@ def main():
     parser.add_argument("--cpu", type=str, choices=list(cpu_types.keys()),
                         default="atomic",
                         help="CPU model to use")
-    parser.add_argument("--cpu-freq", type=str, default="4GHz")
+    parser.add_argument("--cpu-freq", type=str, default="2GHz")
     parser.add_argument("--num-cores", type=int, default=1,
                         help="Number of CPU cores")
     #parser.add_argument("--mem-type", default="DDR3_1600_8x8",

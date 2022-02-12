@@ -133,29 +133,30 @@ class CpuCluster(SubSystem):
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
 
-            if args.fdip:
-                cpu.enableFDIP = args.fdip
+            if cpu_type == "O3CPU":
+                if args.fdip:
+                    cpu.enableFDIP = args.fdip
 
-            if args.perfectICache:
-                cpu.enablePerfectICache = args.perfectICache
+                if args.perfectICache:
+                    cpu.enablePerfectICache = args.perfectICache
 
-            if args.starveAtleast:
-                cpu.starveAtleast = args.starveAtleast
+                if args.starveAtleast:
+                    cpu.starveAtleast = args.starveAtleast
 
-            if args.randomStarve:
-                cpu.randomStarve = args.randomStarve
+                if args.randomStarve:
+                    cpu.randomStarve = args.randomStarve
 
-            if args.pureRandom:
-                cpu.pureRandom = args.pureRandom
+                if args.pureRandom:
+                    cpu.pureRandom = args.pureRandom
 
-            if args.fetchQSize:
-                cpu.fetchQueueSize = args.fetchQSize
+                if args.fetchQSize:
+                    cpu.fetchQueueSize = args.fetchQSize
 
-            if args.ftqSize:
-                cpu.ftqSize = args.ftqSize
+                if args.ftqSize:
+                    cpu.ftqSize = args.ftqSize
 
-            if args.totalSimInsts:
-                cpu.totalSimInsts = args.totalSimInsts
+                if args.totalSimInsts:
+                    cpu.totalSimInsts = args.totalSimInsts
 
             if args.maxinsts:
                 cpu.max_insts_any_thread = args.maxinsts

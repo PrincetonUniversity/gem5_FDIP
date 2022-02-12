@@ -316,7 +316,7 @@ class Gicv3(BaseGic):
             state.addrCells(self.dist_addr) +
             state.sizeCells(0x10000) +
             state.addrCells(self.redist_addr) +
-            state.sizeCells(0x20000) )
+            state.sizeCells(0xf60000) )
 
         node.append(FdtPropertyWords("reg", regs))
         node.append(FdtPropertyWords("interrupts",
