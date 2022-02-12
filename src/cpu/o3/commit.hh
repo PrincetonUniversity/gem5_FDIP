@@ -510,6 +510,7 @@ class Commit
          * squash.
          */
         statistics::Scalar branchMispredicts;
+        statistics::Scalar commPathBranchMispredicts;
         /** Distribution of the number of committed instructions each cycle. */
         statistics::Distribution numCommittedDist;
 

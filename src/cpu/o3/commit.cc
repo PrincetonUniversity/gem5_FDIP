@@ -177,6 +177,8 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
       ADD_STAT(fetchNonSpecCost, "Fetch Cost  in fetch"),
       ADD_STAT(branchMispredicts, statistics::units::Count::get(),
                "The number of times a branch was mispredicted"),
+      ADD_STAT(commPathBranchMispredicts, statistics::units::Count::get(),
+               "The number of times a branch was mispredicted in committed path"),
       ADD_STAT(numCommittedDist, statistics::units::Count::get(),
                "Number of insts commited each cycle"),
       ADD_STAT(instsCommitted, statistics::units::Count::get(),
@@ -218,6 +220,7 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
     fetchNonSpecStallCost.prereq(fetchNonSpecStallCost);
     fetchNonSpecCost.prereq(fetchNonSpecCost);
     branchMispredicts.prereq(branchMispredicts);
+    commPathBranchMispredicts.prereq(commPathBranchMispredicts);
 
     numCommittedDist
         .init(0,commit->commitWidth,1)
@@ -1442,11 +1445,15 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
       //DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c %llu %d\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, mispred, curTick() , head_inst->isControl() ? 'T' : 'F', head_inst->seqNum, head_inst->squashedFromThisInst);
       DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, head_inst->mispredicted() ? 'T':'F', curTick() , head_inst->isControl() ? 'T' : 'F');
     if(head_inst->isControl()){
-      DPRINTFR(MispredCommTrace, "%llu 0x%llx %c %c %c\n", instCount, head_inst->instAddr(), head_inst->mispredicted() ? 'T': 'F', head_inst->isBTBMiss ? 'M' : 'H' , head_inst->isIndirectCtrl()? 'I' : 'D');
+      DPRINTFR(MispredCommTrace, "%llu 0x%llx %c %c %c %llu\n", instCount, head_inst->instAddr(), head_inst->mispredicted() ? 'T': 'F', head_inst->isBTBMiss ? 'M' : 'H' , head_inst->isIndirectCtrl()? 'I' : 'D', thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0));
     }
 
-    if( !head_inst->isMicroop() || head_inst->isLastMicroop())
+    if( !head_inst->isMicroop() || head_inst->isLastMicroop()){
         instCount++;
+        if(head_inst->mispredicted()){
+            stats.commPathBranchMispredicts++;
+        }
+    }
 
     //if(instCount == cpu->totalSimInsts){
     //    // Exit simulation when reached totalSimInsts

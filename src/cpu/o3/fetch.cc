@@ -917,8 +917,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             brseq[tid] = seq[tid];
             seq[tid]++;
             prefPC[tid] = tempPC;
-            //DPRINTF(Fetch, "Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
-            DPRINTFN("Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
+            DPRINTF(Fetch, "Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
+            //DPRINTFN("Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
             //if (prefetchQueue[tid].empty())
             //    TheISA::advancePC(tempPC, inst->staticInst);
             //else {
@@ -1300,7 +1300,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         // Don't send an instruction to decode if we can't handle it.
         if (!(numInst < fetchWidth) ||
                 !(fetchQueue[tid].size() < fetchQueueSize)) {
-            DPRINTFN("Bgodala assert fail Translation fault 0x%lx fetchPC is 0x%lx\n",mem_req->getVaddr(), thisPC.instAddr());
+            DPRINTF(Fetch, "Bgodala assert fail Translation fault 0x%lx fetchPC is 0x%lx\n",mem_req->getVaddr(), thisPC.instAddr());
             //assert(!finishTranslationEvent.scheduled());
             if(finishTranslationEvent.scheduled()){
                 return;
@@ -1997,7 +1997,7 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
         if(nextPC.instAddr() < 0x1000){
             nextPC = branchPC;
             staticBranchInst->advancePC(nextPC);
-            DPRINTFN("Hack: Next pc is %#x\n",nextPC.instAddr());
+            DPRINTF(Fetch,"Hack: Next pc is %#x\n",nextPC.instAddr());
 
             //assert(false && "next pc is < 0x1000\n");
         }
@@ -2369,7 +2369,7 @@ Fetch::addToFTQ()
 
             if(lastProcessedLine == 0 && prefetchBufferPC[tid].empty()){
                 lastProcessedLine = lastAddrFetched;
-                DPRINTFN("PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid].instAddr());
+                DPRINTF(Fetch, "PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid].instAddr());
                 DPRINTF(Fetch, "Fixing lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
             }
 
@@ -2426,7 +2426,7 @@ Fetch::addToFTQ()
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
     if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
         DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
-        DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+        //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
         Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
         prefetchBufferPC[tid].push_back(curPCLine);
@@ -2935,7 +2935,7 @@ Fetch::fetch(bool &status_change)
         //    fetchBuffer[tid].clear();
         //    fetchBufferValid[tid].clear();
             //DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
-            DPRINTFN("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+            DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
         }
     }
 }
