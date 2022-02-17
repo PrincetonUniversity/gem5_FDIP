@@ -65,6 +65,8 @@ class LRUEmissary : public Base
   public:
     /** Convenience typedef. */
     typedef LRUEmissaryRPParams Params;
+    int lru_ways;
+    int preserve_ways;
 
     /**
      * Construct and initiliaze this replacement policy.

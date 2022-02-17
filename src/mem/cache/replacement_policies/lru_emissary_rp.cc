@@ -33,6 +33,7 @@
 
 #include "params/LRUEmissaryRP.hh"
 #include "sim/core.hh"
+#include "base/trace.hh"
 
 namespace gem5
 {
@@ -42,7 +43,8 @@ namespace replacement_policy
 {
 
 LRUEmissary::LRUEmissary(const Params &p)
-    : Base(p)
+    : Base(p), lru_ways(p.lru_ways),
+    preserve_ways(p.preserve_ways)
 {
 }
 
@@ -88,60 +90,90 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     // Find the LRU line among ones in LRU Mode
     for (const auto& candidate : candidates) {
         CacheBlk *blk = reinterpret_cast<CacheBlk*>(candidate);
-        if (!blk->rpMode) {
-            numlru++;
-            if (numlru == 1) {
-                lruEntry = candidate;
-            } else if (std::static_pointer_cast<LRUEmissaryReplData>(
-                    candidate->replacementData)->lastTouchTick <
-                std::static_pointer_cast<LRUEmissaryReplData>(
-                    lruEntry->replacementData)->lastTouchTick) {
-                lruEntry = candidate;
-            }
-        } else {
+
+        if(blk->isPreserve()){
             numpreserve++;
-            if (!blk->isPreserve()) {
-                numNotPreserved++;
-                if (numNotPreserved == 1) {
-                    victimNotSt = candidate;
-                } else if (std::static_pointer_cast<LRUEmissaryReplData>(
-                        candidate->replacementData)->lastTouchTick <
-                    std::static_pointer_cast<LRUEmissaryReplData>(
-                        victimNotSt->replacementData)->lastTouchTick) {
-                    victimNotSt = candidate;
-                }
-            }
-            // Update victim entry if necessary
-            if (numpreserve == 1) {
-                victim = candidate;
+        }else{
+            // LRU of not preserved lines
+            numNotPreserved++;
+            if(numNotPreserved == 1){
+                victimNotSt = candidate;
             } else if (std::static_pointer_cast<LRUEmissaryReplData>(
                     candidate->replacementData)->lastTouchTick <
                 std::static_pointer_cast<LRUEmissaryReplData>(
-                    victim->replacementData)->lastTouchTick) {
-                victim = candidate;
+                    victimNotSt->replacementData)->lastTouchTick) {
+                victimNotSt = candidate;
             }
         }
+        //LRU of all
+        if (std::static_pointer_cast<LRUEmissaryReplData>(
+                candidate->replacementData)->lastTouchTick <
+            std::static_pointer_cast<LRUEmissaryReplData>(
+                lruEntry->replacementData)->lastTouchTick) {
+            lruEntry = candidate;
+        }
+        //if (blk->isPreserve()) {
+        //    numlru++;
+        //    if (numlru == 1) {
+        //        lruEntry = candidate;
+        //    } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //            candidate->replacementData)->lastTouchTick <
+        //        std::static_pointer_cast<LRUEmissaryReplData>(
+        //            lruEntry->replacementData)->lastTouchTick) {
+        //        lruEntry = candidate;
+        //    }
+        //} else {
+        //    numpreserve++;
+        //    if (!blk->isPreserve()) {
+        //        numNotPreserved++;
+        //        if (numNotPreserved == 1) {
+        //            victimNotSt = candidate;
+        //        } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //                candidate->replacementData)->lastTouchTick <
+        //            std::static_pointer_cast<LRUEmissaryReplData>(
+        //                victimNotSt->replacementData)->lastTouchTick) {
+        //            victimNotSt = candidate;
+        //        }
+        //    }
+        //    // Update victim entry if necessary
+        //    if (numpreserve == 1) {
+        //        victim = candidate;
+        //    } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //            candidate->replacementData)->lastTouchTick <
+        //        std::static_pointer_cast<LRUEmissaryReplData>(
+        //            victim->replacementData)->lastTouchTick) {
+        //        victim = candidate;
+        //    }
+        //}
     }
 
-    CacheBlk *lruBlk = reinterpret_cast<CacheBlk*>(lruEntry);
-    // If there are no unpreserved entries in Preserve mode, return lru of lru mode
-    if (!lruBlk->isPreserve() && (numNotPreserved==0 ||
-                                 std::static_pointer_cast<LRUEmissaryReplData>(
-                                 victimNotSt->replacementData)->lastTouchTick >
-                                 std::static_pointer_cast<LRUEmissaryReplData>(
-                                 lruEntry->replacementData)->lastTouchTick)) {
+    DPRINTFN("EMISSRY RP: numlru:%d numNotPreserved:%d numPreserved:%d\n",numlru, numNotPreserved, numpreserve);
+    //assert(numpreserve <= preserve_ways && "numpreserve must be less than preserve_ways\n");
+
+    if(numpreserve > preserve_ways){
         return lruEntry;
-    } else if (lruBlk->isPreserve() && (numNotPreserved==0 &&
-                                 std::static_pointer_cast<LRUEmissaryReplData>(
-                                 victim->replacementData)->lastTouchTick >
-                                 std::static_pointer_cast<LRUEmissaryReplData>(
-                                 lruEntry->replacementData)->lastTouchTick)) {
-        return lruEntry;
+    }else{
+        return victimNotSt;
     }
+    //CacheBlk *lruBlk = reinterpret_cast<CacheBlk*>(lruEntry);
+    //// If there are no unpreserved entries in Preserve mode, return lru of lru mode
+    //if (!lruBlk->isPreserve() && (numNotPreserved==0 ||
+    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             victimNotSt->replacementData)->lastTouchTick >
+    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             lruEntry->replacementData)->lastTouchTick)) {
+    //    return lruEntry;
+    //} else if (lruBlk->isPreserve() && (numNotPreserved==0 &&
+    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             victim->replacementData)->lastTouchTick >
+    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             lruEntry->replacementData)->lastTouchTick)) {
+    //    return lruEntry;
+    //}
 
-    lruBlk->rpMode = true;
+    //lruBlk->rpMode = true;
 
-    return (numNotPreserved>0) ? victimNotSt : victim;
+    //return (numNotPreserved>0) ? victimNotSt : victim;
 }
 
 std::shared_ptr<ReplacementData>

@@ -133,7 +133,8 @@ class CpuCluster(SubSystem):
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
 
-            if cpu_type == "O3CPU":
+            print(cpu_type)
+            if cpu_type == O3CPU:
                 if args.fdip:
                     cpu.enableFDIP = args.fdip
 
