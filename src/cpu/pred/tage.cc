@@ -72,9 +72,9 @@ TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
         return;
     }
 
-    //int nrand = random_mt.random<int>() & 3;
+    int nrand = random_mt.random<int>() & 3;
     // Bgodala removing randomness for sanity check
-    int nrand = 1;
+    //int nrand = 1;
     if (bi->tageBranchInfo->condBranch) {
         tage_bi->isUpdated = true;
         DPRINTF(Tage, "Updating tables for branch:%lx; taken?:%d\n",
