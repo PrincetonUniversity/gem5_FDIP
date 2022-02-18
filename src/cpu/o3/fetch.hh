@@ -354,7 +354,7 @@ class Fetch
      */
     bool checkSignalsAndUpdate(ThreadID tid);
 
-    TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid);
+    TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch);
     void preDecode();
     void addToFTQ();
     /** Does the actual fetching of instructions and passing them on to the

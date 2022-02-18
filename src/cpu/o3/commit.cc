@@ -1443,14 +1443,20 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     prevFetchTick = head_inst->fetchTick;
 
       //DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c %llu %d\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, mispred, curTick() , head_inst->isControl() ? 'T' : 'F', head_inst->seqNum, head_inst->squashedFromThisInst);
-      DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, head_inst->mispredicted() ? 'T':'F', curTick() , head_inst->isControl() ? 'T' : 'F');
+      DPRINTFR(CommTrace, "%llu %ld %ld %ld 0x%llx %lu %c %llu %c %llu\n",head_inst->seqNum, (head_inst->fetchTick), (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, head_inst->mispredicted() ? 'T':'F', curTick() , head_inst->isControl() ? 'T' : 'F',thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0));
     if(head_inst->isControl()){
       DPRINTFR(MispredCommTrace, "%llu %llu 0x%llx %c %c %c %llu\n", head_inst->seqNum, instCount, head_inst->instAddr(), head_inst->mispredicted() ? 'T': 'F', head_inst->isBTBMiss ? 'M' : 'H' , head_inst->isIndirectCtrl()? 'I' : 'D', thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0));
     }
 
     if( !head_inst->isMicroop() || head_inst->isLastMicroop()){
         instCount++;
-        if(head_inst->mispredicted()){
+        auto& brConf = cpu->brConfMap[head_inst->instAddr()];
+        uint64_t &total = std::get<0>(brConf);
+        uint64_t &misPred = std::get<1>(brConf);
+
+        total++;
+        if(head_inst->isControl() && head_inst->mispredicted()){
+            misPred++;
             stats.commPathBranchMispredicts++;
         }
     }

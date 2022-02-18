@@ -814,41 +814,9 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             inst->isControl(), prefetchQueue[tid].empty(), 
             inst->pcState().instAddr(), inst->seqNum, brseq[tid]);
 
-    //if (inst->isReturn()){
-    //    if(!prefetchQueueBr[tid].empty()){
-    //        warn("Return Inst: %llu instPC: %#x prefetchQBRTop: %#x\n",
-    //                curTick(),
-    //                inst->instAddr(),
-    //                prefetchQueueBr[tid].front().instAddr());
-    //    }else{
-    //        warn("Return Inst: %llu instPC: %#x\n",
-    //                curTick(),
-    //                inst->instAddr());
-    //    }
-    //}
-   
     bool predict_taken;
     TheISA::PCState branchPC, tempPC;
     bool predictorInvoked = false;
-
-    //ThreadID tid = inst->threadNumber;
-    //predict_taken = branchPred->predict(inst->staticInst, inst->seqNum,
-//                                        nextPC, tid);
-
-//    if (predict_taken) {
-//        DPRINTF(Fetch, "[tid:%i] [sn:%llu] Branch at PC %#x "
-//                "predicted to be taken to %s\n",
-//                tid, inst->seqNum, inst->pcState().instAddr(), nextPC);
-
-//    } else {
-//        DPRINTF(Fetch, "[tid:%i] [sn:%llu] Branch at PC %#x "
-//                "predicted to be not taken\n",
-//                tid, inst->seqNum, inst->pcState().instAddr());
-//    }
-
-//    DPRINTF(Fetch, "[tid:%i] [sn:%llu] Branch at PC %#x "
-//            "predicted to go to %s\n",
-//            tid, inst->seqNum, inst->pcState().instAddr(), nextPC);
 
     //Pre-decode branch instruction and update BTB
     if (inst->isDirectCtrl() && bblAddr[tid] != 0) {
@@ -1953,7 +1921,7 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
 }
 
 TheISA::PCState
-Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branchPC, ThreadID tid)
+Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch)
 {
     TheISA::PCState predictPC = prefetchPc;
     if (!branchPred->getBblValid(prefetchPc.instAddr(), tid))
@@ -2027,6 +1995,17 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
        predictPC = nextPC;
 
        DPRINTF(Fetch, "Prefetch predict: %#x, %s, %#x, %#x\n", prefetchPc.instAddr(), staticBranchInst, branch, predictPC.instAddr());
+       if(staticBranchInst->isUncondCtrl() && !predict_taken){
+           DPRINTF(Fetch, "Stop prefetching on unconditional not taken branch\n");
+           stopPrefetch = true;
+       }
+       auto& brConf = cpu->brConfMap[branch];
+       uint64_t &total = std::get<0>(brConf);
+       uint64_t &misPred = std::get<1>(brConf);
+
+       if(total > 100 && misPred/total > 0.2){
+           stopPrefetch = true;
+       }
 
     return predictPC;
 }
@@ -2238,7 +2217,8 @@ Fetch::addToFTQ()
 
     // Keep issuing while prefetchQueue is available
     while ( prefetchQueue[tid].size() < ftqSize ) {
-        nextPC = predictNextBasicBlock(thisPC, branchPC, tid);
+        bool stopPrefetch = false;
+        nextPC = predictNextBasicBlock(thisPC, branchPC, tid, stopPrefetch);
 
         if (nextPC.instAddr()>0x10) {
             TheISA::PCState prevPrefPC = prefPC[tid];;
@@ -2257,6 +2237,7 @@ Fetch::addToFTQ()
 	            DPRINTF(Bgodala, "BGODALA bblSize Mismatch\n");
 	            DPRINTF(Bgodala, "bblSize:%d diff is %d\n",tempBblSize, (branchPC.instAddr() - thisPC.instAddr()));
 	            DPRINTF(Bgodala, "thisPC: %s and branchPC: %s", thisPC, branchPC);
+                prefPC[tid] = 0;
                 return;
                 //assert(false && "Check BTB parameters\n");
 	        }
@@ -2355,6 +2336,10 @@ Fetch::addToFTQ()
             thisPC = nextPC;
             branchPC = thisPC;
             lastProcessedLine = 0;
+            if(stopPrefetch){
+                prefPC[tid] = 0;
+                return;
+            }
         } else{
         
             //FIXME: prefPC line here and set lastAddrFetched
@@ -2561,9 +2546,11 @@ Fetch::fetch(bool &status_change)
     // Need to halt fetch if quiesce instruction detected
     bool quiesce = false;
 
-    TheISA::MachInst *cacheInsts =
-        //reinterpret_cast<TheISA::MachInst *>(fetchBuffer[tid]);
-        reinterpret_cast<TheISA::MachInst *>(fetchBuffer[tid].front());
+    //TheISA::MachInst *cacheInsts =
+    //    //reinterpret_cast<TheISA::MachInst *>(fetchBuffer[tid]);
+    //    reinterpret_cast<TheISA::MachInst *>(fetchBuffer[tid].front());
+
+    uint8_t* fetchBufferHead = fetchBuffer[tid].front();
 
     const unsigned numInsts = fetchBufferSize / instSize;
     //unsigned blkOffset = (fetchAddr - fetchBufferPC[tid]) / instSize;
@@ -2572,6 +2559,7 @@ Fetch::fetch(bool &status_change)
     assert(fetchBufferPC[tid].size() > 0 && "fetchBufferPC[tid] size must be > 0\n");
     unsigned blkOffset = (fetchAddr - fetchBufferPC[tid].front()) / instSize;
     
+
     // cms11 oracle
     bool repl_first_inst = true;
 
@@ -2608,7 +2596,7 @@ Fetch::fetch(bool &status_change)
             }
 
             memcpy(dec_ptr->moreBytesPtr(),
-                    fetchBuffer[tid].front() + blkOffset * instSize, instSize);
+                    fetchBufferHead + blkOffset * instSize, instSize);
             decoder[tid]->moreBytes(thisPC, fetchAddr);
 
             if (dec_ptr->needMoreBytes()) {
@@ -3142,6 +3130,20 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //if (prefetchQueue[tid].empty()) {
     //    return;
     //}
+    // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
+    //if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
+    //    DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+    //    //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+    //    TheISA::PCState thisPC = pc[tid];
+    //    Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+    //    prefetchBufferPC[tid].push_back(curPCLine);
+    //    lastAddrFetched = curPCLine;
+    //    //lastPrefPC = thisPC;
+    //    lastPrefPC = pc[tid]; 
+    //    lastProcessedLine = 0;
+    //    prefPC[tid] = pc[tid];
+    //}
+
     if (prefetchBufferPC[tid].empty()) {
         return;
     }
