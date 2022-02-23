@@ -153,7 +153,7 @@ class CpuCluster(SubSystem):
                 if args.fetchQSize:
                     cpu.fetchQueueSize = args.fetchQSize
 
-                if args.ftqSize:
+                if args.ftqSize >=0:
                     cpu.ftqSize = args.ftqSize
 
                 if args.totalSimInsts:

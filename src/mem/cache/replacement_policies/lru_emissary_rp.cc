@@ -147,7 +147,7 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
         //}
     }
 
-    DPRINTFN("EMISSRY RP: numlru:%d numNotPreserved:%d numPreserved:%d\n",numlru, numNotPreserved, numpreserve);
+    //DPRINTFN("EMISSRY RP: numlru:%d numNotPreserved:%d numPreserved:%d\n",numlru, numNotPreserved, numpreserve);
     //assert(numpreserve <= preserve_ways && "numpreserve must be less than preserve_ways\n");
 
     if(numpreserve > preserve_ways){

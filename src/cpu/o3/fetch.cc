@@ -208,6 +208,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
     srand(123456);
     // Get the size of an instruction.
     instSize = decoder[0]->moreBytesSize();
+    warn("ftqSize is %d\n",ftqSize);
 }
 
 std::string Fetch::name() const { return cpu->name() + ".fetch"; }
@@ -986,7 +987,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     bblSize[tid] = 0;
 
     if(enableFDIP && predictorInvoked){
-        warn("VERIFY: Self modifying corner case found! %llu\n",curTick());
+        //warn("VERIFY: Self modifying corner case found! %llu\n",curTick());
         // When predictor is invoked reset prefetching
         prefPC[tid] = nextPC;
         lastPrefPC = 0; 
@@ -994,15 +995,19 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         prefetchQueueBblSize[tid].clear();
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
-        prefetchBufferPC[tid].clear();
-        fetchBuffer[tid].clear();
-        fetchBufferPC[tid].clear();
-        fetchBufferReqPtr[tid].clear();
-        fetchBufferValid[tid].clear();
-        memReq[tid].clear();
         lastProcessedLine = 0;
         lastAddrFetched = 0;
         fallThroughPrefPC = 0;
+
+        //Flush fetch and prefetch buffer only on taken branch
+        //if(predict_taken){
+        //    prefetchBufferPC[tid].clear();
+        //    fetchBuffer[tid].clear();
+        //    fetchBufferPC[tid].clear();
+        //    fetchBufferReqPtr[tid].clear();
+        //    fetchBufferValid[tid].clear();
+        //    memReq[tid].clear();
+        //}
         
     //    lastProcessedLine = 0;
     //    lastAddrFetched = 0;
@@ -1442,8 +1447,8 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
     DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s.\n",
             tid, newPC);
 
-    DPRINTF(Fetch, "[tid:%i] prefetchQueue size: %d, %s.\n",
-            tid, prefetchQueue[tid].size(), prefetchQueue[tid].front());
+    //DPRINTF(Fetch, "[tid:%i] prefetchQueue size: %d, %s.\n",
+    //        tid, prefetchQueue[tid].size(), prefetchQueue[tid].front());
     //if (lastinst[tid]) {
         prefPC[tid] = newPC;
         lastPrefPC = newPC;
@@ -2517,17 +2522,17 @@ Fetch::addToFTQ()
     }
 
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
-    if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
-        DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
-        //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
-        TheISA::PCState thisPC = pc[tid];
-        Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
-        prefetchBufferPC[tid].push_back(curPCLine);
-        lastAddrFetched = curPCLine;
-        //lastPrefPC = thisPC;
-        lastPrefPC = prefPC[tid];
-        lastProcessedLine = 0;
-    }
+    //if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
+    //    DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+    //    //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+    //    TheISA::PCState thisPC = pc[tid];
+    //    Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+    //    prefetchBufferPC[tid].push_back(curPCLine);
+    //    lastAddrFetched = curPCLine;
+    //    //lastPrefPC = thisPC;
+    //    lastPrefPC = prefPC[tid];
+    //    lastProcessedLine = 0;
+    //}
 }
 
 void
@@ -3268,18 +3273,18 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //    return;
     //}
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
-    //if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
-    //    DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
-    //    //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
-    //    TheISA::PCState thisPC = pc[tid];
-    //    Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
-    //    prefetchBufferPC[tid].push_back(curPCLine);
-    //    lastAddrFetched = curPCLine;
-    //    //lastPrefPC = thisPC;
-    //    lastPrefPC = prefPC[tid]; 
-    //    lastProcessedLine = 0;
-    //    //prefPC[tid] = pc[tid];
-    //}
+    if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
+        DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+        //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
+        TheISA::PCState thisPC = pc[tid];
+        Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+        prefetchBufferPC[tid].push_back(curPCLine);
+        lastAddrFetched = curPCLine;
+        //lastPrefPC = thisPC;
+        lastPrefPC = prefPC[tid]; 
+        lastProcessedLine = 0;
+        //prefPC[tid] = pc[tid];
+    }
 
     if (prefetchBufferPC[tid].empty()) {
         return;
