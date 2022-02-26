@@ -916,17 +916,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 
             //assert(false && "branchpred called from fetch\n");
             if(enableFDIP){
-                //prefetchBufferPC[tid].clear();
-                //fetchBuffer[tid].clear();
-                //fetchBufferPC[tid].clear();
-                //fetchBufferReqPtr[tid].clear();
-                //fetchBufferValid[tid].clear();
                 predictorInvoked = true;
             }
-        }else{
-            //if(inst->isDirectCtrl() && predict_taken){
-            //    assert(inst->branchTarget().instAddr() == tempPC.instAddr() && "wrong branch target\n");
-            //}
         }
 
         DPRINTF(Fetch, "[tid:%i] [sn:%llu, %llu] Branch at PC %#x "
@@ -934,7 +925,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
                 brseq[tid], inst->pcState().instAddr(), tempPC, predict_taken, 
                 branchPC.instAddr(), prefetchQueue[tid].size());
     } else {
-        //DPRINTF(Fetch, "Nayana lookupAndupdate\n");
+        DPRINTF(Fetch, "Nayana lookupAndupdate\n");
         tempPC = nextPC;
 	    DPRINTF(Fetch, "Bgodala tempPC is %#x\n", tempPC.instAddr());
         predict_taken = branchPred->predict(inst->staticInst, seq[tid],
@@ -944,11 +935,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         //assert(false && "branchpred called from fetch\n");
 
         if(enableFDIP){
-            //prefetchBufferPC[tid].clear();
-            //fetchBuffer[tid].clear();
-            //fetchBufferPC[tid].clear();
-            //fetchBufferReqPtr[tid].clear();
-            //fetchBufferValid[tid].clear();
             predictorInvoked = true;
         }
     }
@@ -1033,33 +1019,8 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         prefetchQueueBr[tid].clear();
         lastProcessedLine = 0;
         //Fix this later
-        lastAddrFetched = 0;
+        lastAddrFetched = fetchBufferAlignPC(nextPC.instAddr()) & decoder[tid]->pcMask();
         fallThroughPrefPC = 0;
-
-        //if(predict_taken){
-        //    prefPC[tid] = nextPC;
-        //    lastPrefPC = 0; 
-        //}
-        //Flush fetch and prefetch buffer only on taken branch
-        //if(predict_taken){
-        //    prefetchBufferPC[tid].clear();
-        //    fetchBuffer[tid].clear();
-        //    fetchBufferPC[tid].clear();
-        //    fetchBufferReqPtr[tid].clear();
-        //    fetchBufferValid[tid].clear();
-        //    memReq[tid].clear();
-        //}
-        
-    //    lastProcessedLine = 0;
-    //    lastAddrFetched = 0;
-    //    fallThroughPrefPC = 0;
-    //    //if(predict_taken){
-    //    //    prefetchBufferPC[tid].clear();
-    //    //    fetchBuffer[tid].clear();
-    //    //    fetchBufferPC[tid].clear();
-    //    //    fetchBufferReqPtr[tid].clear();
-    //    //    fetchBufferValid[tid].clear();
-    //    //}
     }
 
     //if (prefetchQueue[0].size()==0){
@@ -2439,27 +2400,27 @@ Fetch::addToFTQ()
                 lastProcessedLine = 0;
             }
 
-            //if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
-            //    if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
-            //        do{
-            //            if(lastAddrFetched != curPCLine){
-            //                if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
-            //                    DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-            //                    prefetchBufferPC[tid].push_back(curPCLine);
-            //                    lastAddrFetched = curPCLine;
-            //                }else if(prefetchBufferPC[tid].empty()){
-            //                    DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-            //                    prefetchBufferPC[tid].push_back(curPCLine);
-            //                    lastAddrFetched = curPCLine;
-            //                }
-            //            }
-            //            curPCLine += CACHE_LINE_SIZE;
-            //            //if(curPCLine > branchPCLine){
-            //            //  break;
-            //            //}
-            //        }while(curPCLine <= branchPCLine);
-            //    }
-            //}
+            if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
+                if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
+                    do{
+                        if(lastAddrFetched != curPCLine){
+                            if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                                DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                prefetchBufferPC[tid].push_back(curPCLine);
+                                lastAddrFetched = curPCLine;
+                            }else if(prefetchBufferPC[tid].empty()){
+                                DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                prefetchBufferPC[tid].push_back(curPCLine);
+                                lastAddrFetched = curPCLine;
+                            }
+                        }
+                        curPCLine += CACHE_LINE_SIZE;
+                        //if(curPCLine > branchPCLine){
+                        //  break;
+                        //}
+                    }while(curPCLine <= branchPCLine);
+                }
+            }
             
             // OOO fetch
             Addr fetchAddr = nextPC.instAddr() & decoder[tid]->pcMask();
@@ -3335,8 +3296,7 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //    return;
     //}
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
-    //if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
-    if (prefetchBufferPC[tid].empty()){
+    if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
         DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
