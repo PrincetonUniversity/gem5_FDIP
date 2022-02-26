@@ -901,7 +901,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             seq[tid]++;
             prefPC[tid] = tempPC;
             DPRINTF(Fetch, "Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
-            DPRINTFN("Nayana mismatch %#x, %#x\n", branchPC.instAddr(), inst->instAddr());
             //if (prefetchQueue[tid].empty())
             //    TheISA::advancePC(tempPC, inst->staticInst);
             //else {
@@ -936,7 +935,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
                 branchPC.instAddr(), prefetchQueue[tid].size());
     } else {
         //DPRINTF(Fetch, "Nayana lookupAndupdate\n");
-        DPRINTFN("Nayana lookupAndupdate %s\n",nextPC);
         tempPC = nextPC;
 	    DPRINTF(Fetch, "Bgodala tempPC is %#x\n", tempPC.instAddr());
         predict_taken = branchPred->predict(inst->staticInst, seq[tid],
@@ -1450,7 +1448,6 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         memReq[tid].clear();
         //Stop prefetching too
         prefPC[tid]=0;
-        DPRINTFN("TRAP prefPC is %s is zero %d\n",prefPC[tid], prefPC[tid]==0);
 
         // Send the fault to commit.  This thread will not do anything
         // until commit handles the fault.  The only other way it can
@@ -2132,7 +2129,6 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
         }
 
         DPRINTF(Bgodala, "prefetchPc: 0x%lx branchPC: 0x%lx nextPC: 0x%lx\n", prefetchPc.instAddr(), branchPC.instAddr(), nextPC.instAddr());
-        DPRINTFN("prefetchPc: %s branchPC: %s nextPC: %s\n", prefetchPc, branchPC, nextPC);
         if (predict_taken) {
             DPRINTF(Fetch, "[tid:%i] [sn:%llu] Branch at PC %#x "
                     "predicted to be taken to %s\n",
@@ -2509,7 +2505,7 @@ Fetch::addToFTQ()
         } else{
         
             if(nextPC.instAddr() !=0){
-                DPRINTFN("prefetch nextPC is %s\n",nextPC);
+                DPRINTF(Fetch, "prefetch nextPC is %s\n",nextPC);
             }
             break;
             //FIXME: prefPC line here and set lastAddrFetched
@@ -3128,7 +3124,6 @@ Fetch::fetch(bool &status_change)
             fetchBufferValid[tid].clear();
             memReq[tid].clear();
             //DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
-            DPRINTFN("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             lastProcessedLine = 0;
             lastAddrFetched = 0;
             fallThroughPrefPC = 0;
