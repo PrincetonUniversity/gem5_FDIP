@@ -2052,9 +2052,9 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
         StaticInstPtr staticBranchInst = branchPred->getBranch(prefetchPc.instAddr(), tid);
         branchPC = branchPred->getBranchPC(prefetchPc.instAddr(), tid);
 
-        if(!staticBranchInst->isDirectCtrl()){
-            return 0;
-        }
+        //if(!staticBranchInst->isDirectCtrl()){
+        //    return 0;
+        //}
         
         if(branchPC.instAddr() < prefetchPc.instAddr()){
             DPRINTF(Fetch, "Fix this case later\n");
