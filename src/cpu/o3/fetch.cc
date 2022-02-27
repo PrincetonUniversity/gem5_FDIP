@@ -883,9 +883,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         predict_taken = nextPC.npc() != tempPC.instAddr();
 
         if (branchPC.instAddr()!=inst->instAddr()){
-            if (inst->isReturn()){
-                warn("Return Inst: %llu\n", curTick());
-            }
             // squash branch predictor state to remove stale entries
             branchPred->squash(brseq[tid]-1, tid);
             // Reset prefetch Queue
@@ -2336,7 +2333,7 @@ Fetch::addToFTQ()
         return;
     }
     //assert(prefPC[tid].instAddr() != 0 && "prefPC cannot be 0\n");
-    //preDecode();
+    preDecode();
     // The current Prefetch PC.
     TheISA::PCState thisPC = prefPC[tid];
     TheISA::PCState nextPC = thisPC;
@@ -2393,6 +2390,7 @@ Fetch::addToFTQ()
             //Do not add a line to prefetchBufferPC if the size does not match
             DPRINTF(Fetch, "prevPrefPC %#x and fallThroughPrefPC %#x\n",prevPrefPC.instAddr(), fallThroughPrefPC);
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
             
             //When lastProcessedLine is different from lastAddrFetched
             if ( lastProcessedLine != lastAddrFetched  ){
@@ -2403,22 +2401,28 @@ Fetch::addToFTQ()
             if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
                 if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
                     do{
-                        if(lastAddrFetched != curPCLine){
+                        //if(lastAddrFetched != curPCLine){
                             if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
                                 DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                 prefetchBufferPC[tid].push_back(curPCLine);
                                 lastAddrFetched = curPCLine;
                             }else if(prefetchBufferPC[tid].empty()){
-                                DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                                prefetchBufferPC[tid].push_back(curPCLine);
-                                lastAddrFetched = curPCLine;
+                                if(curPCLine != lastAddrFetched){
+                                    DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                    prefetchBufferPC[tid].push_back(curPCLine);
+                                    lastAddrFetched = curPCLine;
+                                }
                             }
-                        }
+                        //}
+                        DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
                         curPCLine += CACHE_LINE_SIZE;
                         //if(curPCLine > branchPCLine){
                         //  break;
                         //}
                     }while(curPCLine <= branchPCLine);
+                    DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
+                }else{
+                    DPRINTF(Fetch, "Size mismatch branchPC: %s thisPC: %s\n", branchPC, thisPC);
                 }
             }
             
@@ -2465,10 +2469,6 @@ Fetch::addToFTQ()
             }
         } else{
         
-            if(nextPC.instAddr() !=0){
-                DPRINTF(Fetch, "prefetch nextPC is %s\n",nextPC);
-            }
-            break;
             //FIXME: prefPC line here and set lastAddrFetched
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
             
@@ -2515,16 +2515,14 @@ Fetch::addToFTQ()
                 curPCLine  &= decoder[tid]->pcMask();
                 branchPCLine &= decoder[tid]->pcMask();
 
-                if(lastAddrFetched != curPCLine){
-                    if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
-                        DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                        prefetchBufferPC[tid].push_back(curPCLine);
-                        lastAddrFetched = curPCLine;
-                    }else if(prefetchBufferPC[tid].empty()){
-                        DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                        prefetchBufferPC[tid].push_back(curPCLine);
-                        lastAddrFetched = curPCLine;
-                    }
+                if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                    DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                    prefetchBufferPC[tid].push_back(curPCLine);
+                    lastAddrFetched = curPCLine;
+                }else if(prefetchBufferPC[tid].empty() && curPCLine!=lastAddrFetched){
+                    DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                    prefetchBufferPC[tid].push_back(curPCLine);
+                    lastAddrFetched = curPCLine;
                 }
                 if(prefetchBufferPC[tid].empty()){
                     DPRINTFN("Corner case found %#x\n", lastAddrFetched);
