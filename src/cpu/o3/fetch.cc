@@ -799,6 +799,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     // this function updates it.
     //bool predict_taken;
     ThreadID tid = inst->threadNumber;
+    TheISA::PCState thisPC = nextPC;
     TheISA::PCState ftPC = nextPC;
     inst->staticInst->advancePC(ftPC);
 
@@ -1016,7 +1017,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         prefetchQueueBr[tid].clear();
         lastProcessedLine = 0;
         //Fix this later
-        lastAddrFetched = fetchBufferAlignPC(nextPC.instAddr()) & decoder[tid]->pcMask();
+        lastAddrFetched = fetchBufferAlignPC(thisPC.instAddr()) & decoder[tid]->pcMask();
         fallThroughPrefPC = 0;
     }
 
@@ -2180,6 +2181,7 @@ Fetch::preDecode(){
         Addr lastAddr = fetchBufferBlockPC + CACHE_LINE_SIZE;
         auto *dec_ptr = preDecoder[tid];
 
+        assert(blkOffset <= CACHE_LINE_SIZE && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
         DPRINTF(Fetch, "fetchBufferValid Size: %d fetchBufferPC Size: %d fetchBuffer Size: %d\n",fetchBufferValid[tid].size(),fetchBufferPC[tid].size(),fetchBuffer[tid].size());
 
         //bufIt buf_it = fetchBuffer[tid].begin();
