@@ -1017,8 +1017,18 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         prefetchQueueBr[tid].clear();
         lastProcessedLine = 0;
         //Fix this later
-        lastAddrFetched = fetchBufferAlignPC(thisPC.instAddr()) & decoder[tid]->pcMask();
+        lastAddrFetched = prefetchBufferPC[tid].front(); 
         fallThroughPrefPC = 0;
+        //Flush everything except head
+        prefetchBufferPC[tid].erase(++prefetchBufferPC[tid].begin(),prefetchBufferPC[tid].end());
+        fetchBuffer[tid].erase(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
+        fetchBufferPC[tid].erase(++fetchBufferPC[tid].begin(), fetchBufferPC[tid].end());
+        fetchBufferReqPtr[tid].erase(++fetchBufferReqPtr[tid].begin(),fetchBufferReqPtr[tid].end());
+        fetchBufferValid[tid].erase(++fetchBufferValid[tid].begin(),fetchBufferValid[tid].end());
+        memReq[tid].clear();
+        //DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+        //
+        //
     }
 
     //if (prefetchQueue[0].size()==0){
@@ -1272,6 +1282,9 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                         val_it++;
                         req_it++;
                     }
+                    //Stop prefetching and also predecoding
+                    prefPC[tid]=0;
+                    lastPrefPC = 0;
                 }
                 cacheBlocked = true;
             } else {
@@ -1474,7 +1487,10 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
     fetchOffset[tid] = 0;
     if (squashInst && squashInst->pcState().instAddr() == newPC.instAddr()) {
         macroop[tid] = squashInst->macroop;
-        macroop[tid] = NULL; 
+        if(squashInst->macroop){
+            warn("Found macroop on squash at PC:%s tick %llu\n",newPC, curTick());
+        }
+        //macroop[tid] = NULL; 
         //for ( auto &buf_it : fetchBuffer[tid]){
         //    delete &*buf_it;
         //}
@@ -2177,11 +2193,12 @@ Fetch::preDecode(){
         TheISA::PCState nextPC = thisPC;;
         int pcOffset = 0;
 
-        unsigned blkOffset = (fetchAddr - fetchBufferBlockPC) / instSize;
-        Addr lastAddr = fetchBufferBlockPC + CACHE_LINE_SIZE;
+        unsigned blkOffset = (fetchAddr - fetchBufferPC[tid].back()) / instSize;
+        //Addr lastAddr = fetchBufferBlockPC + CACHE_LINE_SIZE;
+        Addr lastAddr = fetchBufferPC[tid].back() + CACHE_LINE_SIZE;
         auto *dec_ptr = preDecoder[tid];
 
-        assert(blkOffset <= CACHE_LINE_SIZE && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
+        assert(blkOffset <= 16 && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
         DPRINTF(Fetch, "fetchBufferValid Size: %d fetchBufferPC Size: %d fetchBuffer Size: %d\n",fetchBufferValid[tid].size(),fetchBufferPC[tid].size(),fetchBuffer[tid].size());
 
         //bufIt buf_it = fetchBuffer[tid].begin();
@@ -2205,12 +2222,14 @@ Fetch::preDecode(){
 
         while(fetchAddr < lastAddr){
             unsigned dec_data = 0;
+            assert(blkOffset <= 16 && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
             DPRINTF(Fetch, "predecoder: fetchAddr is %#x fetchBufferBlockPC: %#x lastPrefPC[0]: %#x blkOffset: %d\n", fetchAddr, fetchBufferBlockPC, lastPrefPC.instAddr(), blkOffset);
             memcpy(&dec_data,
                     fetchBuffer[tid].back() + blkOffset * instSize, instSize);
             DPRINTF(Fetch, "predecoder: fetchAddr is %#x fetchBufferBlockPC: %#x lastPrefPC[0]: %#x blkOffset: %d Data: %#x\n", fetchAddr, fetchBufferBlockPC, lastPrefPC.instAddr(), blkOffset, dec_data);
             bool needMem = !inRom && !curMacroop && !dec_ptr->instReady();
             fetchAddr = (thisPC.instAddr() + pcOffset) & dec_ptr->pcMask();
+            assert(fetchAddr == fetchBufferPC[tid].back() + blkOffset * instSize && "Predcode address mismatch\n");
 
             if(needMem){
                 memcpy(dec_ptr->moreBytesPtr(),
@@ -2619,7 +2638,7 @@ Fetch::fetch(bool &status_change)
             //if(!macroop[tid])
             //    DPRINTF(Fetch, "bgodala: LOOK HERE for this case!!\n");
             
-            assert(macroop[tid] == NULL && "Do not fetch new line when macroop is not null\n");
+            //assert(macroop[tid] == NULL && "Do not fetch new line when macroop is not null\n");
             assert(!inRom && "Do not fetch new line when inRom\n");
 
             if(fetchBufferValid[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front()){
