@@ -1487,9 +1487,6 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
     fetchOffset[tid] = 0;
     if (squashInst && squashInst->pcState().instAddr() == newPC.instAddr()) {
         macroop[tid] = squashInst->macroop;
-        if(squashInst->macroop){
-            warn("Found macroop on squash at PC:%s tick %llu\n",newPC, curTick());
-        }
         //macroop[tid] = NULL; 
         //for ( auto &buf_it : fetchBuffer[tid]){
         //    delete &*buf_it;
@@ -2375,8 +2372,6 @@ Fetch::addToFTQ()
             lastPrefPC = prefPC[tid];
             prefPC[tid] = nextPC;
             // Add to the prefetch queue
-            prefetchQueue[tid].push_back(nextPC);
-            prefetchQueueBblSize[tid].push_back(branchPC.instAddr() - thisPC.instAddr());
             if (branchPC.instAddr() < thisPC.instAddr()){
                 DPRINTF(Fetch, "should not happen branchPC: %s thisPC: %s\n", branchPC, thisPC);
                 assert(false && "Should not happen\n");
@@ -2390,12 +2385,15 @@ Fetch::addToFTQ()
                 prefPC[tid] = 0;
                 warn("bblSize Mismatch\n");
                 //assert(false && "Check BTB parameters\n");
+                branchPred->squash(seq[tid]-1,tid);
                 seq[tid]++;
                 return;
 	        }
             if(prefetchQueue[tid].size()==1) {
                 prevPC[tid] = thisPC;
             } 
+            prefetchQueue[tid].push_back(nextPC);
+            prefetchQueueBblSize[tid].push_back(branchPC.instAddr() - thisPC.instAddr());
             prefetchQueueSeqNum[tid].push_back(seq[tid]);
             prefetchQueueBr[tid].push_back(branchPC);
             seq[tid]++;
