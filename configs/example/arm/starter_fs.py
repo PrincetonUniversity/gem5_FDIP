@@ -120,7 +120,8 @@ def create(args):
                                   workload=ArmFsLinux(
                                       object_file=
                                       SysPaths.binary(args.kernel)),
-                                  readfile=args.script)
+                                  readfile=args.script,
+                                  m1=args.m1)
 
     #CacheConfig.config_cache(args, system)
     MemConfig.config_mem(args, system)
@@ -264,6 +265,7 @@ def main():
                         default="atomic",
                         help="CPU model to use")
     parser.add_argument("--cpu-freq", type=str, default="2GHz")
+    parser.add_argument("--m1", default="False", action="store_true")
     parser.add_argument("--num-cores", type=int, default=1,
                         help="Number of CPU cores")
     #parser.add_argument("--mem-type", default="DDR3_1600_8x8",

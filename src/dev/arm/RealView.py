@@ -1468,7 +1468,7 @@ class VExpress_GEM5_Foundation(VExpress_GEM5_Base):
                 cur_sys, boot_loader)
 
 class QEMU_Virt(RealView):
-    _mem_regions = [ AddrRange('1GiB', size='8GiB') ]
+    _mem_regions = [ AddrRange('1GiB', size='32GiB') ]
     pci_host = GenericArmPciHost(
         conf_base=0x4010000000, conf_size='256MiB', conf_device_bits=12,
         pci_pio_base=0x3eff0000,
@@ -1581,4 +1581,10 @@ class QEMU_Virt(RealView):
         device.pci_dev = self._num_pci_dev
         device.pci_func = 0
         self._attach_device(device, *args, **kwargs)
+
+class QEMU_VirtM1(QEMU_Virt):
+    gic = GicV2(dist_addr=0x8000000, cpu_addr=0x8010000)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 

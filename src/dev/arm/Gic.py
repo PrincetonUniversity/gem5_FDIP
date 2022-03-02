@@ -160,6 +160,26 @@ class GicV2(BaseGic):
     it_lines = Param.UInt32(128, "Number of interrupt lines supported (max = 1020)")
     gem5_extensions = Param.Bool(False, "Enable gem5 extensions")
 
+    def generateDeviceTree(self, state):
+        node = FdtNode("interrupt-controller")
+        node.appendCompatible(["gem5,gic", "arm,cortex-a15-gic",
+                               "arm,cortex-a9-gic"])
+        node.append(self._state.interruptCellsProperty())
+        node.append(self._state.addrCellsProperty())
+        node.append(FdtProperty("interrupt-controller"))
+
+        regs = (
+            state.addrCells(self.dist_addr) +
+            state.sizeCells(0x1000) +
+            state.addrCells(self.cpu_addr) +
+            state.sizeCells(self.cpu_size))
+        node.append(FdtPropertyWords("reg", regs))
+
+        node.appendPhandle(self)
+
+        yield node
+
+
 class Gic400(GicV2):
     """
     As defined in:

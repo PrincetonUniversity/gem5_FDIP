@@ -349,9 +349,10 @@ class FastmodelCluster(SubSystem):
 class BaseSimpleSystem(ArmSystem):
     cache_line_size = 64
 
-    def __init__(self, mem_size, platform, **kwargs):
+    def __init__(self, mem_size, platform, m1, **kwargs):
         super(BaseSimpleSystem, self).__init__(**kwargs)
 
+        print("M1 enabled {}".format(m1))
         self.voltage_domain = VoltageDomain(voltage="1.0V")
         self.clk_domain = SrcClockDomain(
             clock="1GHz",
@@ -359,7 +360,10 @@ class BaseSimpleSystem(ArmSystem):
 
         if platform is None:
             #self.realview = VExpress_GEM5_V1()
-            self.realview = QEMU_Virt()
+            if m1:
+                self.realview = QEMU_VirtM1()
+            else:
+                self.realview = QEMU_Virt()
         else:
             self.realview = platform
 
