@@ -114,8 +114,8 @@ def create(args):
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
     #want_caches = True
 
-    system = devices.SimpleSystem(want_caches,
-                                  args.mem_size,
+    system = devices.SimpleSystem(caches=want_caches,
+                                  mem_size = args.mem_size,
                                   mem_mode=mem_mode,
                                   workload=ArmFsLinux(
                                       object_file=
@@ -265,7 +265,7 @@ def main():
                         default="atomic",
                         help="CPU model to use")
     parser.add_argument("--cpu-freq", type=str, default="2GHz")
-    parser.add_argument("--m1", default="False", action="store_true")
+    parser.add_argument("--m1", default=False, action="store_true")
     parser.add_argument("--num-cores", type=int, default=1,
                         help="Number of CPU cores")
     #parser.add_argument("--mem-type", default="DDR3_1600_8x8",
@@ -284,7 +284,7 @@ def main():
 
     Options.addCommonOptions(parser)
     args = parser.parse_args()
-
+    print(args)
     root = Root(full_system=True)
     root.system = create(args)
 
