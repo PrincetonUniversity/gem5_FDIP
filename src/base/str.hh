@@ -116,7 +116,7 @@ typename std::enable_if_t<std::is_integral<T>::value &&
 __to_number(const std::string &value)
 {
     // Cannot parse scientific numbers
-    if (value.find('e') != std::string::npos) {
+    if (value.find('x') == std::string::npos && value.find('e') != std::string::npos) {
         throw std::invalid_argument("Cannot convert scientific to integral");
     }
     // start big and narrow it down if needed, determine the base dynamically
@@ -134,7 +134,7 @@ typename std::enable_if_t<std::is_integral<T>::value &&
 __to_number(const std::string &value)
 {
     // Cannot parse scientific numbers
-    if (value.find('e') != std::string::npos) {
+    if (value.find('x') == std::string::npos && value.find('e') != std::string::npos) {
         throw std::invalid_argument("Cannot convert scientific to integral");
     }
     // start big and narrow it down if needed, determine the base dynamically
@@ -149,7 +149,7 @@ typename std::enable_if_t<std::is_enum<T>::value, T>
 __to_number(const std::string &value)
 {
     // Cannot parse scientific numbers
-    if (value.find('e') != std::string::npos) {
+    if (value.find('x') == std::string::npos && value.find('e') != std::string::npos) {
         throw std::invalid_argument("Cannot convert scientific to integral");
     }
     auto r = __to_number<typename std::underlying_type<T>::type>(value);
