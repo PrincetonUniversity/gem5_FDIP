@@ -66,6 +66,12 @@ CacheBlk::insert(const Addr tag, const bool is_secure,
 
     // Insertion counts as a reference to the block
     increaseRefCount();
+    l1AccessCount = 1;
+    starveCount = 0;
+    starveHistory = 0;
+
+    rpMode = false;
+    miss_cost = 0;
 }
 
 void

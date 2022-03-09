@@ -58,6 +58,7 @@
 #include "mem/packet.hh"
 #include "mem/request.hh"
 #include "sim/cur_tick.hh"
+#include "base/trace.hh"
 
 namespace gem5
 {
@@ -169,7 +170,8 @@ class CacheBlk : public TaggedEntry
     std::list<Lock> lockList;
 
   public:
-    CacheBlk() : TaggedEntry(), data(nullptr), _tickInserted(0)
+    CacheBlk() : TaggedEntry(), data(nullptr), l1AccessCount(0),
+        starveCount(0), starveHistory(0), _tickInserted(0)
     {
         invalidate();
     }
@@ -188,6 +190,7 @@ class CacheBlk : public TaggedEntry
     virtual CacheBlk&
     operator=(CacheBlk&& other)
     {
+        DPRINTFN("Calling CacheBlk = operator\n");
         // Copying an entry into a valid one would imply in skipping all
         // replacement steps, so it cannot be allowed
         assert(!isValid());
@@ -204,6 +207,12 @@ class CacheBlk : public TaggedEntry
         setRefCount(other.getRefCount());
         setSrcRequestorId(other.getSrcRequestorId());
         std::swap(lockList, other.lockList);
+
+        l1AccessCount = other.l1AccessCount;
+        starveCount = other.starveCount;
+        starveHistory = other.starveHistory;
+        rpMode = other.rpMode;
+        miss_cost = other.miss_cost;
 
         other.invalidate();
 

@@ -437,11 +437,13 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         // the packet in a response
         ppHit->notify(pkt);
 
+        //DPRINTFN("REQ: %s starveHistory for addr %#x is %#x\n", name(), pkt->getAddr(), blk->starveHistory);
         //EMISSARY: BEGIN
         if (pkt->isWriteback() && pkt->evictFromL1) {
             blk->l1AccessCount = pkt->accessCount;
-            blk->starveHistory = (blk->starveHistory << 1) | (pkt->isStarved() ? 1 : 0);
-            blk->starveCount += (pkt->isStarved() ? 1 : 0);
+            blk->starveHistory = (pkt->starveHistory << 1) | (pkt->isStarved() ? 1 : 0);
+            blk->starveCount = pkt->starveCount + (pkt->isStarved() ? 1 : 0);
+            DPRINTFN("L2 BLK Update: starveHistory for addr %#x is %#x starveCount %d\n", pkt->getAddr(), blk->starveHistory, blk->starveCount);
 	    }
         //EMISSARY: END
 
@@ -572,6 +574,12 @@ BaseCache::recvTimingResp(PacketPtr pkt)
         // response is not a cache invalidate, we promote targets that
         // were deferred as we couldn't guarrantee a writable copy
         mshr->promoteWritable();
+    }
+    if(isReadOnly && blk){
+        DPRINTFN("RESP: %s starveHistory for addr %#x is %#x starveCount %d\n", name(), pkt->getAddr(), pkt->starveHistory,
+                 pkt->starveCount);
+        blk->starveHistory = pkt->starveHistory;
+        blk->starveCount = pkt->starveCount; 
     }
 
     serviceMSHRTargets(mshr, pkt, blk);
@@ -1167,6 +1175,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
 
 
         //EMISSARY: BEGIN
+        DPRINTFN("SATISFY: %s starveHistory for addr %#x is %#x starveCount %u\n", name(), pkt->getAddr(), blk->starveHistory, blk->starveCount);
         pkt->starveHistory = blk->starveHistory;
         pkt->accessCount = blk->getRefCount();
         pkt->starveCount = blk->starveCount;
@@ -1258,6 +1267,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
     // Access block in the tags
     Cycles tag_latency(0);
     blk = tags->accessBlock(pkt, tag_latency);
+
 
     DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
             blk ? "hit " + blk->print() : "miss");
@@ -1736,6 +1746,8 @@ BaseCache::writebackBlk(CacheBlk *blk)
         pkt->tickBlkInserted = blk->getTickInserted();
         pkt->tickBlkRecentAccess = blk->tickRecentAccess; 
         pkt->accessCount = blk->getRefCount();
+        pkt->starveCount = blk->starveCount;
+        pkt->starveHistory = blk->starveHistory;
     }
     //EMISSARY: END
     
