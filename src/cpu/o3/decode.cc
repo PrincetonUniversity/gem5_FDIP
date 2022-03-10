@@ -608,6 +608,7 @@ Decode::decode(bool &status_change, ThreadID tid)
     //     continue trying to empty skid buffer
     //     check if stall conditions have passed
 
+    toFetch->decodeStatus[tid] = decodeStatus[tid];
     if (decodeStatus[tid] == Blocked) {
         ++stats.blockedCycles;
         idleCount[tid] = 0;

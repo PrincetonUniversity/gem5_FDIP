@@ -230,6 +230,7 @@ struct TimeStruct
 
     bool decodeBlock[MaxThreads];
     bool decodeIdle[MaxThreads];
+    int  decodeStatus[MaxThreads];
     bool decodeUnblock[MaxThreads];
     bool renameBlock[MaxThreads];
     bool renameUnblock[MaxThreads];

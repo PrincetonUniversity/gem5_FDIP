@@ -560,7 +560,12 @@ Fetch::processCacheCompletion(PacketPtr pkt)
 
     double random = double(rand()) * 100 / (double(RAND_MAX) + 1.0);
     bool didWeStarve = false;
-    if(decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
+
+    //if(*pc_it == fetchBufferBlockPC && (fromDecode->decodeIdle[tid] ) && !decodeIdle[tid]){
+    //    DPRINTFN("fetch head PC: %#x decodeStatus %d\n",*pc_it, fromDecode->decodeStatus[tid]); 
+    //}
+
+    if(fromDecode->decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
         DPRINTF(Fetch, "%#x %s %d ", (*memReq_it)->getVaddr(), level, resteer);
         resteer = false;
         RequestPtr mem_req2 = std::make_shared<Request>(
@@ -577,11 +582,12 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             missSt[tid][(pkt->req->getVaddr())>>6] ='S';
             //fetchIcacheMissL1StDump++;
             int numStarves = 0;
-            for(int i=0; i<8; i++) {
-                if ((pkt->starveHistory>>i) & 1) {
-                    numStarves++;
-                }
-            }
+            //for(int i=0; i<8; i++) {
+            //    if ((pkt->starveHistory>>i) & 1) {
+            //        numStarves++;
+            //    }
+            //}
+            numStarves = pkt->starveCount;
 
             if (!pureRandom && pkt->req->getAccessDepth()==1) {
                 //fetchL2HitStarve++;

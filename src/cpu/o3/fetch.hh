@@ -583,6 +583,7 @@ class Fetch
     int32_t ftqSize;
     bool trackLastBlock;
     bool decodeIdle[MaxThreads];
+    int  decodeStatus[MaxThreads];
     Addr starvationPC[MaxThreads];
     int32_t numSets;
 

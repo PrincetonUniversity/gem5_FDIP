@@ -1450,15 +1450,15 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
     if( !head_inst->isMicroop() || head_inst->isLastMicroop()){
         instCount++;
-        auto& brConf = cpu->brConfMap[head_inst->instAddr()];
-        uint64_t &total = std::get<0>(brConf);
-        uint64_t &misPred = std::get<1>(brConf);
+        //auto& brConf = cpu->brConfMap[head_inst->instAddr()];
+        //uint64_t &total = std::get<0>(brConf);
+        //uint64_t &misPred = std::get<1>(brConf);
 
-        total++;
-        if(head_inst->isControl() && head_inst->mispredicted()){
-            misPred++;
-            stats.commPathBranchMispredicts++;
-        }
+        //total++;
+        //if(head_inst->isControl() && head_inst->mispredicted()){
+        //    misPred++;
+        //    stats.commPathBranchMispredicts++;
+        //}
     }
 
     //if(instCount == cpu->totalSimInsts){
