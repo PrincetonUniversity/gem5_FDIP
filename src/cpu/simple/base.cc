@@ -76,6 +76,7 @@
 #include "sim/sim_object.hh"
 #include "sim/stats.hh"
 #include "sim/system.hh"
+#include "debug/AtomicMispredCommTrace.hh"
 
 namespace gem5
 {
@@ -474,6 +475,7 @@ BaseSimpleCPU::advancePC(const Fault &fault)
 
     const bool branching(thread->pcState().branching());
 
+    TheISA::PCState tempPCState = thread->pcState();
     //Since we're moving to a new pc, zero out the offset
     t_info.fetchOffset = 0;
     if (fault != NoFault) {
@@ -494,6 +496,10 @@ BaseSimpleCPU::advancePC(const Fault &fault)
         // Use a fake sequence number since we only have one
         // instruction in flight at the same time.
         const InstSeqNum cur_sn(0);
+        DPRINTFR(AtomicMispredCommTrace, "%#x %#x %c\n", 
+                tempPCState.instAddr(), 
+                tempPCState.npc(), 
+                t_info.predPC == thread->pcState() ? 'P': 'M');
 
         if (t_info.predPC == thread->pcState()) {
             // Correctly predicted branch
