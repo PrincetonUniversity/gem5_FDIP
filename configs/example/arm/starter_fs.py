@@ -195,17 +195,21 @@ def create(args):
 
     return system
 
-def parse_stats():
+def parse_stats(args):
     stats_file = os.path.join(m5.options.outdir,'stats.txt')
     stats_file_handle = open(stats_file,'r')
     found = False
+
+    warmup_instcount = 5000000
+    if args.warmup_insts:
+        warmup_instcount = args.warmup_insts
     for line in stats_file_handle:
         if "simInsts" in line:
             toks = line.split()
-            instCount = int(toks[1])
-            print(toks)
-            print(instCount)
-            if(instCount >= 5000000):
+            inst_count = int(toks[1])
+            #print(toks)
+            #print(inst_count)
+            if(inst_count >= warmup_instcount):
                 found = True
                 break
     stats_file_handle.close()
@@ -219,13 +223,16 @@ def run(args):
     if args.checkpoint:
         print("Checkpoint directory: %s" % cptdir)
 
-    #while True:
-    #    event = m5.simulate(250000000)
-    #    m5.stats.dump()
-    #    if(parse_stats()):
-    #        break
+    while True:
+        event = m5.simulate(250000000)
+        m5.stats.dump()
+        if(parse_stats(args)):
+            break
 
-    #m5.stats.reset()
+    # Reset stats and prepare to get final stats
+    m5.stats.reset()
+    m5.stats.outputList.clear()
+    m5.stats.addStatVisitor("stats_final.txt")
 
     while True:
         event = m5.simulate()
@@ -239,6 +246,7 @@ def run(args):
             print(exit_msg, " @ ", m5.curTick())
             break
 
+    m5.stats.dump()
     sys.exit(event.getCode())
 
 

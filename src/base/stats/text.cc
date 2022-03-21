@@ -100,8 +100,8 @@ Text::~Text()
 void
 Text::open(std::ostream &_stream)
 {
-    if (stream)
-        panic("stream already set!");
+    //if (stream)
+    //    panic("stream already set!");
 
     mystream = false;
     stream = &_stream;
@@ -811,7 +811,7 @@ initText(const std::string &filename, bool desc, bool spaces)
         text.descriptions = desc;
         text.enableUnits = desc; // the units are printed if descs are
         text.spaces = spaces;
-        connected = true;
+        //connected = true;
     }
 
     return &text;
