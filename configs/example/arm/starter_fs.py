@@ -223,16 +223,17 @@ def run(args):
     if args.checkpoint:
         print("Checkpoint directory: %s" % cptdir)
 
-    while True:
-        event = m5.simulate(250000000)
-        m5.stats.dump()
-        if(parse_stats(args)):
-            break
+    if args.warmup_insts:
+        while True:
+            event = m5.simulate(250000000)
+            m5.stats.dump()
+            if(parse_stats(args)):
+                break
 
-    # Reset stats and prepare to get final stats
-    m5.stats.reset()
-    m5.stats.outputList.clear()
-    m5.stats.addStatVisitor("stats_final.txt")
+        # Reset stats and prepare to get final stats
+        m5.stats.reset()
+        m5.stats.outputList.clear()
+        m5.stats.addStatVisitor("stats_final.txt")
 
     while True:
         event = m5.simulate()
@@ -274,6 +275,9 @@ def main():
                         help="CPU model to use")
     parser.add_argument("--cpu-freq", type=str, default="2GHz")
     parser.add_argument("--m1", default=False, action="store_true")
+    parser.add_argument("--opt", default=False, action="store_true")
+    parser.add_argument("--numSets", type=int, default=64,
+                        help="Number of L1i sets")
     parser.add_argument("--num-cores", type=int, default=1,
                         help="Number of CPU cores")
     #parser.add_argument("--mem-type", default="DDR3_1600_8x8",

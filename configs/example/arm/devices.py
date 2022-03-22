@@ -51,7 +51,7 @@ class L1I(L1_ICache):
     mshrs = 4
     tgts_per_mshr = 20
     size = '64kB'
-    assoc = 8
+    assoc = 256
 
 
 class L1D(L1_DCache):
@@ -161,6 +161,15 @@ class CpuCluster(SubSystem):
                     if args.warmup_insts:
                         cpu.totalSimInsts += args.warmup_insts
 
+                # 0: ORACLE
+                # 1: LRU
+                # 2: RANDOM
+                # 3: NONE
+                if args.opt:
+                    cpu.cache_repl = 0
+
+                if args.numSets:
+                    cpu.numSets = args.numSets
 
             if args.maxinsts:
                 cpu.max_insts_any_thread = args.maxinsts
@@ -193,6 +202,8 @@ class CpuCluster(SubSystem):
             if self._l1i_rp:
                 if self._l1i_rp == "LRUEmissary":
                     l1i.replacement_policy = LRUEmissaryRP()
+                elif self._l1i_rp == "OPT":
+                    l1i.replacement_policy = OPTRP()
                 elif self._l1i_rp == "LIP":
                     l1i.replacement_policy = LIPRP()
                 elif self._l1i_rp == "BIP":

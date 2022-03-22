@@ -62,6 +62,7 @@
 #include "params/BaseCache.hh"
 #include "params/WriteAllocator.hh"
 #include "sim/cur_tick.hh"
+#include "mem/cache/tags/base_set_assoc.hh"
 
 namespace gem5
 {
@@ -134,6 +135,14 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
         "Compressed cache %s does not have a compression algorithm", name());
     if (compressor)
         compressor->setCache(this);
+
+    auto *set_assoc = dynamic_cast<BaseSetAssoc*>(tags);
+    if(set_assoc){
+        auto *OPTPolicy = dynamic_cast<replacement_policy::OPT*>(set_assoc->replacementPolicy);
+        if(OPTPolicy){
+            OPTPolicy->cache = this;
+        }
+    }
 }
 
 BaseCache::~BaseCache()
@@ -392,6 +401,7 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
         if (pkt->isPreserve()) { 
             //blk->coherence |= CacheBlk::BlkPreserve;
             blk->setCoherenceBits(CacheBlk::BlkPreserve);
+            //blk->starveHistory = 0;
         }
         tags->starveMRU(pkt->getAddr(), pkt->isSecure());
         delete pkt;
@@ -443,7 +453,13 @@ BaseCache::recvTimingReq(PacketPtr pkt)
             blk->l1AccessCount = pkt->accessCount;
             blk->starveHistory = (pkt->starveHistory << 1) | (pkt->isStarved() ? 1 : 0);
             blk->starveCount = pkt->starveCount + (pkt->isStarved() ? 1 : 0);
-            DPRINTFN("L2 BLK Update: starveHistory for addr %#x is %#x starveCount %d\n", pkt->getAddr(), blk->starveHistory, blk->starveCount);
+            // Reset histroy and count if preserved line is evicted from L1
+            if(pkt->isStarved() && pkt->isPreserve()){
+                blk->starveCount = 0;
+                blk->starveHistory = 0;
+                blk->l1AccessCount = 0;
+            }
+            DPRINTF(Cache, "L2 BLK Update: starveHistory for addr %#x is %#x starveCount %d\n", pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0, blk->starveHistory, blk->starveCount);
 	    }
         //EMISSARY: END
 
@@ -576,7 +592,7 @@ BaseCache::recvTimingResp(PacketPtr pkt)
         mshr->promoteWritable();
     }
     if(isReadOnly && blk){
-        DPRINTFN("RESP: %s starveHistory for addr %#x is %#x starveCount %d\n", name(), pkt->getAddr(), pkt->starveHistory,
+        DPRINTF(Cache, "RESP: %s starveHistory for addr %#x is %#x starveCount %d\n", name(), pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0, pkt->starveHistory,
                  pkt->starveCount);
         blk->starveHistory = pkt->starveHistory;
         blk->starveCount = pkt->starveCount; 
@@ -1175,7 +1191,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
 
 
         //EMISSARY: BEGIN
-        DPRINTFN("SATISFY: %s starveHistory for addr %#x is %#x starveCount %u\n", name(), pkt->getAddr(), blk->starveHistory, blk->starveCount);
+        DPRINTF(Cache, "SATISFY: %s starveHistory for addr %#x is %#x starveCount %u\n", name(), pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0, blk->starveHistory, blk->starveCount);
         pkt->starveHistory = blk->starveHistory;
         pkt->accessCount = blk->getRefCount();
         pkt->starveCount = blk->starveCount;
@@ -1743,6 +1759,7 @@ BaseCache::writebackBlk(CacheBlk *blk)
     if( isReadOnly ){
         pkt->evictFromL1 = true;
         pkt->setStarved(blk->isStarved());
+        pkt->setPreserve(blk->isPreserve());
         pkt->tickBlkInserted = blk->getTickInserted();
         pkt->tickBlkRecentAccess = blk->tickRecentAccess; 
         pkt->accessCount = blk->getRefCount();

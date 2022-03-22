@@ -61,6 +61,7 @@
 #include "mem/cache/tags/indexing_policies/base.hh"
 #include "mem/packet.hh"
 #include "params/BaseSetAssoc.hh"
+#include "mem/cache/replacement_policies/opt_rp.hh"
 
 namespace gem5
 {
@@ -84,6 +85,7 @@ class BaseSetAssoc : public BaseTags
     /** Whether tags and data are accessed sequentially. */
     const bool sequentialAccess;
 
+  public:
     /** Replacement policy */
     replacement_policy::Base *replacementPolicy;
 

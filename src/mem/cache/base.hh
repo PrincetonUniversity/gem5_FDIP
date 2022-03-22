@@ -75,6 +75,7 @@
 #include "sim/serialize.hh"
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
+#include "mem/cache/replacement_policies/opt_rp.hh"
 
 namespace gem5
 {
@@ -824,13 +825,14 @@ class BaseCache : public ClockedObject
      */
     void evictBlock(CacheBlk *blk, PacketList &writebacks);
 
+  public:
     /**
      * Invalidate a cache block.
      *
      * @param blk Block to invalidate
      */
     void invalidateBlock(CacheBlk *blk);
-
+  protected:
     /**
      * Create a writeback request for the given block.
      *

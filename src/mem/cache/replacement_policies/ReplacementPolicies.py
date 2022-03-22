@@ -68,6 +68,11 @@ class LRURP(BaseReplacementPolicy):
     cxx_class = 'gem5::replacement_policy::LRU'
     cxx_header = "mem/cache/replacement_policies/lru_rp.hh"
 
+class OPTRP(BaseReplacementPolicy):
+    type = 'OPTRP'
+    cxx_class = 'gem5::replacement_policy::OPT'
+    cxx_header = "mem/cache/replacement_policies/opt_rp.hh"
+
 class LRUEmissaryRP(BaseReplacementPolicy):
     type = 'LRUEmissaryRP'
     cxx_class = 'gem5::replacement_policy::LRUEmissary'

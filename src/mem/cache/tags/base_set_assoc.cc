@@ -64,6 +64,10 @@ BaseSetAssoc::BaseSetAssoc(const Params &p)
     if (blkSize < 4 || !isPowerOf2(blkSize)) {
         fatal("Block size must be at least 4 and a power of 2");
     }
+    auto *OPTPolicy = dynamic_cast<replacement_policy::OPT*>(replacementPolicy);
+    if(OPTPolicy){
+        OPTPolicy->tags = this;
+    }
 }
 
 void
@@ -80,8 +84,13 @@ BaseSetAssoc::tagsInit()
         // Associate a data chunk to the block
         blk->data = &dataBlks[blkSize*blk_index];
 
+        auto *OPTPolicy = dynamic_cast<replacement_policy::OPT*>(replacementPolicy);
         // Associate a replacement data entry to the block
-        blk->replacementData = replacementPolicy->instantiateEntry();
+        if(OPTPolicy){
+            blk->replacementData = OPTPolicy->instantiateEntry(blk);
+        }else{
+            blk->replacementData = replacementPolicy->instantiateEntry();
+        }
     }
 }
 
