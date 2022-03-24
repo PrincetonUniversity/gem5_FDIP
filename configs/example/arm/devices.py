@@ -51,7 +51,7 @@ class L1I(L1_ICache):
     mshrs = 4
     tgts_per_mshr = 20
     size = '64kB'
-    assoc = 256
+    assoc = 8
 
 
 class L1D(L1_DCache):
@@ -204,6 +204,8 @@ class CpuCluster(SubSystem):
                     l1i.replacement_policy = LRUEmissaryRP()
                 elif self._l1i_rp == "OPT":
                     l1i.replacement_policy = OPTRP()
+                    l1i.assoc = 256
+                    l1i.size = '1024kB'
                 elif self._l1i_rp == "LIP":
                     l1i.replacement_policy = LIPRP()
                 elif self._l1i_rp == "BIP":
@@ -219,12 +221,19 @@ class CpuCluster(SubSystem):
             else:
                 l1i.replacement_policy = LRURP()
 
+            if self._args.opt:
+                l1i.assoc = 256
+                l1i.size = '1024kB'
+
             l1i.lru_ways = 2
             if self._preserve_ways:
                 l1i.preserve_ways = self._preserve_ways
                 l1i.lru_ways = 8 - int(self._preserve_ways)
             else:
                 l1i.preserve_ways = 6
+
+            if self._args.l1i_size:
+                l1i.size=self._args.l1i_size
 
             print("adding L1 Caches")
             cpu.addPrivateSplitL1Caches(l1i, l1d, iwc, dwc)
@@ -234,6 +243,13 @@ class CpuCluster(SubSystem):
             return
         self.toL2Bus = L2XBar(width=64, clk_domain=clk_domain)
         self.l2 = self._l2_type()
+
+        if self._l1i_rp == "OPT" or self._args.opt:
+            self.l2.size = '2048kB'
+
+        if self._args.l2_size:
+            self.l2.size = self._args.l2_size
+
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
         self.toL2Bus.mem_side_ports = self.l2.cpu_side
