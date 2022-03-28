@@ -179,6 +179,7 @@ class BaseCPU(ClockedObject):
     cache_repl = Param.Unsigned(3, "Cache Replacement Policy")
     numSets = Param.Unsigned(64, "Num of Icacahe Sets")
     pureRandom = Param.Bool(False, "PureRandom")
+    histRandom = Param.Bool(False, "HistRandom")
     ftqSize = Param.Int(5, "Fetch target queue size")
     emissaryEnableIQEmpty = Param.Bool(False, "EMISSARY Set starvation bit only IQ is empty")
     enablePerfectICache = Param.Bool(False,"Enable perfect I-Cache")

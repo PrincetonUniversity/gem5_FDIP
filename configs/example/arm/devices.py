@@ -77,8 +77,8 @@ class WalkCache(PageTableWalkerCache):
 
 
 class L2(L2Cache):
-    tag_latency = 10
-    data_latency = 10
+    tag_latency = 5
+    data_latency = 5
     response_latency = 10
     mshrs = 32
     tgts_per_mshr = 8
@@ -107,7 +107,7 @@ class MemBus(SystemXBar):
 class CpuCluster(SubSystem):
     def __init__(self, system,  num_cpus, cpu_clock, cpu_voltage,
                  cpu_type, l1i_type, l1d_type, wcache_type, l2_type,
-                 l1i_rp, preserve_ways, args):
+                 l1i_rp, l2_rp, preserve_ways, args):
         super(CpuCluster, self).__init__()
         self._cpu_type = cpu_type
         self._l1i_type = l1i_type
@@ -117,6 +117,7 @@ class CpuCluster(SubSystem):
         self._l1i_rp = l1i_rp
         self._preserve_ways = preserve_ways
         self._args = args
+        self._l2_rp = l2_rp
 
         assert num_cpus > 0
 
@@ -149,6 +150,9 @@ class CpuCluster(SubSystem):
 
                 if args.pureRandom:
                     cpu.pureRandom = args.pureRandom
+
+                if args.histRandom:
+                    cpu.histRandom = args.histRandom
 
                 if args.fetchQSize:
                     cpu.fetchQueueSize = args.fetchQSize
@@ -244,8 +248,19 @@ class CpuCluster(SubSystem):
         self.toL2Bus = L2XBar(width=64, clk_domain=clk_domain)
         self.l2 = self._l2_type()
 
+        if self._l2_rp == "LRUEmissary":
+            self.l2.replacement_policy = LRUEmissaryRP()
+
+        self.l2.lru_ways = 2
+        if self._preserve_ways:
+            self.l2.preserve_ways = self._preserve_ways
+            self.l2.lru_ways = 8 - int(self._preserve_ways)
+        else:
+            self.l2.preserve_ways = 6
+
         if self._l1i_rp == "OPT" or self._args.opt:
             self.l2.size = '2048kB'
+            self.l2.assoc = 512
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size

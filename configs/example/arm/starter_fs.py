@@ -154,6 +154,7 @@ def create(args):
                            args.cpu_freq, "1.0V",
                            *cpu_types[args.cpu],
                            l1i_rp=args.l1i_rp,
+                           l2_rp=args.l2_rp,
                            preserve_ways=args.preserve_ways,
                            args=args),
     ]

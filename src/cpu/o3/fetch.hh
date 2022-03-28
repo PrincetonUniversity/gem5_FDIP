@@ -578,6 +578,7 @@ class Fetch
     int32_t starveAtleast;
     bool randomStarve;
     bool pureRandom;
+    bool histRandom;
     bool sbip;
     bool resteer;
     int32_t ftqSize;
@@ -586,6 +587,7 @@ class Fetch
     int  decodeStatus[MaxThreads];
     Addr starvationPC[MaxThreads];
     int32_t numSets;
+    std::map<Addr, Addr> V2PMap;
 
     /** Set to true if a pipelined I-cache request should be issued. */
     bool issuePipelinedIfetch[MaxThreads];

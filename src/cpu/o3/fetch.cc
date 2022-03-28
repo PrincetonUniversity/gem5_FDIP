@@ -148,6 +148,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       starveAtleast(params.starveAtleast),
       randomStarve(params.randomStarve),
       pureRandom(params.pureRandom),
+      histRandom(params.histRandom),
       ftqSize(params.ftqSize),
       trackLastBlock(false),
       numSets(params.numSets),
@@ -582,17 +583,22 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             missSt[tid][(pkt->req->getVaddr())>>6] ='S';
             //fetchIcacheMissL1StDump++;
             int numStarves = 0;
-            //for(int i=0; i<8; i++) {
-            //    if ((pkt->starveHistory>>i) & 1) {
-            //        numStarves++;
-            //    }
-            //}
-            numStarves = pkt->starveCount;
+            for(int i=0; i<8; i++) {
+                if ((pkt->starveHistory>>i) & 1) {
+                    numStarves++;
+                }
+            }
+            //numStarves = pkt->starveCount;
 
             if (!pureRandom && pkt->req->getAccessDepth()==1) {
                 //fetchL2HitStarve++;
                 didWeStarve = true;
-                data_pkt2->setStarved(true);
+                if(histRandom){
+                    if(random < starveRandomness)
+                        data_pkt2->setStarved(true);
+                }else{
+                    data_pkt2->setStarved(true);
+                }
                 // Random preserve insertion OR
                 // Insert always OR
                 // 50% or more of misses led to starvation OR
@@ -1199,6 +1205,16 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             return;
         }
 
+        //Insert Mapping in V2PMap only when ORACLE is enabled
+        if(REPL == ORACLE){
+            Addr vaddr = mem_req->getVaddr();
+            Addr paddr = mem_req->getPaddr();
+
+            vaddr = vaddr & ~(SETS - 1);
+            paddr = paddr & ~(SETS - 1);
+            assert( (vaddr & (SETS - 1)) == 0 && "Lower bits of Vaddr is not 0");
+            V2PMap[vaddr] = paddr;
+        }
         // Build packet here.
         PacketPtr data_pkt = new Packet(mem_req, MemCmd::ReadReq);
         data_pkt->dataDynamic(new uint8_t[fetchBufferSize]);
@@ -1244,10 +1260,10 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
               [this,data_pkt]{ 
               processCacheCompletion(data_pkt);}, "BGODALA"), cpu->clockEdge(Cycles(ICACHE_ACCESS_LATENCY)));
 
-            // Send this packet to model bandwidth utilization
-            PacketPtr dummy_data_pkt = new Packet(mem_req, MemCmd::ReadReq);
-            dummy_data_pkt->dataDynamic(new uint8_t[fetchBufferSize]);
-            icachePort.sendTimingReq(dummy_data_pkt);
+            //// Send this packet to model bandwidth utilization
+            //PacketPtr dummy_data_pkt = new Packet(mem_req, MemCmd::ReadReq);
+            //dummy_data_pkt->dataDynamic(new uint8_t[fetchBufferSize]);
+            //icachePort.sendTimingReq(dummy_data_pkt);
         }else{
             if (!icachePort.sendTimingReq(data_pkt)) {
                 DPRINTF(Fetch, "SendTimingReq failed\n");
@@ -2100,9 +2116,9 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
             nextPC = branchPC;
             nextPC.npc(nextPC.pc() + 4);
             staticBranchInst->advancePC(nextPC);
-            DPRINTF(Fetch,"Hack: Next pc is %#x\n",nextPC.instAddr());
-            DPRINTFN("Hack: branchPC %s and Next pc is %s\n",branchPC, nextPC);
 
+            DPRINTF(Fetch, "Stop prefetching on unconditional not taken branch\n");
+            stopPrefetch = true;
             //assert(false && "next pc is < 0x1000\n");
         }
 
@@ -2131,10 +2147,10 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
        predictPC = nextPC;
 
        DPRINTF(Fetch, "Prefetch predict: %#x, %s, %#x, %#x\n", prefetchPc.instAddr(), staticBranchInst, branch, predictPC.instAddr());
-       //if(staticBranchInst->isUncondCtrl() && !predict_taken){
-       //    DPRINTF(Fetch, "Stop prefetching on unconditional not taken branch\n");
-       //    stopPrefetch = true;
-       //}
+       if((staticBranchInst->isUncondCtrl() ||  staticBranchInst->isIndirectCtrl()) && !predict_taken){
+           DPRINTF(Fetch, "Stop prefetching on unconditional not taken branch\n");
+           stopPrefetch = true;
+       }
        //auto& brConf = cpu->brConfMap[branch];
        //uint64_t &total = std::get<0>(brConf);
        //uint64_t &misPred = std::get<1>(brConf);
@@ -2143,7 +2159,7 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
        //    stopPrefetch = true;
        //}
 
-        assert(predictPC.instAddr() > 0x1000  && "This should not happen\n");
+        //assert(predictPC.instAddr() > 0x1000  && "This should not happen\n");
     return predictPC;
 }
 
@@ -2384,6 +2400,14 @@ Fetch::addToFTQ()
             }
             //prefetchQueueBblSize[tid].push_back(branchPred->getBblSize(thisPC.instAddr(), tid));
 	        int tempBblSize = branchPred->getBblSize(thisPC.instAddr(), tid);
+            if(stopPrefetch){
+                prefPC[tid] = 0;
+                lastPrefPC = 0;
+                //warn("stop prefetching\n");
+                branchPred->squash(seq[tid]-1,tid);
+                seq[tid]++;
+                return;
+            }
             if(tempBblSize != (branchPC.instAddr() - thisPC.instAddr())){
 	            DPRINTF(Bgodala, "BGODALA bblSize Mismatch\n");
 	            DPRINTF(Bgodala, "bblSize:%d diff is %d\n",tempBblSize, (branchPC.instAddr() - thisPC.instAddr()));
@@ -2488,10 +2512,6 @@ Fetch::addToFTQ()
             thisPC = nextPC;
             branchPC = thisPC;
             lastProcessedLine = 0;
-            if(stopPrefetch){
-                prefPC[tid] = 0;
-                return;
-            }
         } else{
         
             //FIXME: prefPC line here and set lastAddrFetched
@@ -2964,7 +2984,8 @@ Fetch::fetch(bool &status_change)
                             Request::INST_FETCH, cpu->instRequestorId(), e_pc,
                             cpu->thread[tid]->contextId());
                         evict_mem_req->taskId(cpu->taskId());
-                        Fault e_fault = cpu->mmu->translateFunctional(evict_mem_req, cpu->thread[tid]->getTC(), BaseMMU::Execute);
+                        evict_mem_req->setPaddr(V2PMap[e_pc]);
+                        //Fault e_fault = cpu->mmu->translateFunctional(evict_mem_req, cpu->thread[tid]->getTC(), BaseMMU::Execute);
                         //cout << "fault: " << e_fault << endl;
                         PacketPtr evict_pkt = new Packet(evict_mem_req, MemCmd::ReadReq);
                         //ibufferPort.sendTimingBufToCacheWrite(evict_pkt);
@@ -3547,7 +3568,7 @@ Fetch::IcachePort::recvTimingResp(PacketPtr pkt)
     if(!fetch->enablePerfectICache){
         fetch->processCacheCompletion(pkt);
     }else{
-        delete pkt;
+        //delete pkt;
     }
 
 
