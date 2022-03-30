@@ -390,9 +390,6 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
 
     CacheBlk *blk = tags->findBlock(pkt->getAddr(), pkt->isSecure());
 
-    DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
-            blk ? "hit " + blk->print() : "miss");
-    
     if (blk) {
         if (pkt->isStarved()){
             //blk->coherence |= CacheBlk::BlkStarved;
@@ -404,6 +401,8 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
             //blk->starveHistory = 0;
         }
         tags->starveMRU(pkt->getAddr(), pkt->isSecure());
+        DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
+                blk ? "hit " + blk->print() : "miss");
         delete pkt;
         return true;
     } 
@@ -455,9 +454,11 @@ BaseCache::recvTimingReq(PacketPtr pkt)
             blk->starveCount = pkt->starveCount + (pkt->isStarved() ? 1 : 0);
             // Reset histroy and count if preserved line is evicted from L1
             if(pkt->isStarved() && pkt->isPreserve()){
-                blk->starveCount = 0;
-                blk->starveHistory = 0;
-                blk->l1AccessCount = 0;
+                //blk->starveCount = 0;
+                //blk->starveHistory = 0;
+                //blk->l1AccessCount = 0;
+                blk->setCoherenceBits(CacheBlk::BlkStarved);
+                blk->setCoherenceBits(CacheBlk::BlkPreserve);
             }
             DPRINTF(Cache, "L2 BLK Update: starveHistory for addr %#x is %#x starveCount %d\n", pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0, blk->starveHistory, blk->starveCount);
 	    }
