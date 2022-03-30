@@ -93,6 +93,7 @@ class OPT : public Base
                                                                      override;
 
     void touch(const std::shared_ptr<ReplacementData>& replacement_data);
+    void cleanup(CacheBlk *blk);
 
     /**
      * Reset replacement data. Used when an entry is inserted.

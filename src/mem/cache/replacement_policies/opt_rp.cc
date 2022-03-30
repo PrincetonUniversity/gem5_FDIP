@@ -82,9 +82,12 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
     //unsigned int ind = (unsigned)(a & 0x3f);
     uint32_t ind = blk->getSet(); 
     Addr a = blk->getTag();
+    DPRINTFN("OPT:touch TAG is %#x\n",a);
+    DPRINTFN("OPT:touch set:%d and way:%d\n",blk->getSet(), blk->getWay());
     a = a << 6;
     a = a | (ind & 0x3f);
     // check oneMisses
+    DPRINTFN("OPT:touch addr is %#x\n", (a << 6));
     vector<Addr> new_evicts;
     int possible_evicts = 1;
     int last_size = 0;
@@ -160,7 +163,7 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
     // debug
     //cout << "cache cap: " << dec << in_cache[ind].size() << endl;
     //cout << "in_cache[" << dec << ind << "]: [";
-    assert(in_cache[ind].size() < 256);
+    assert(in_cache[ind].size() <= 256);
     for (int c = 0; c < in_cache[ind].size() - 1; c++) {
         //cout << hex << in_cache[ind][c] << ", ";
     }
@@ -196,9 +199,13 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
         //cout << "evict addr: " << hex << (new_evicts[e] << 6) << endl;
         Addr e_fetchBufferBlockPC = new_evicts[e] << 6;
         Addr e_pc = e_fetchBufferBlockPC;
+        DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
+
         CacheBlk *blk = tags->findBlock(e_pc, false); 
-        if(blk)
+        if(blk){
+            DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
             cache->invalidateBlock(blk);
+        }
     }
     // end of oracle cache repl mod
     ////////////////////////////////
@@ -211,6 +218,68 @@ OPT::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
     // Set last touch timestamp
     std::static_pointer_cast<OPTReplData>(
         replacement_data)->lastTouchTick = curTick();
+
+   auto *non_const_this = const_cast<OPT*>(this);
+
+   non_const_this->touch(replacement_data);
+}
+
+void
+OPT::cleanup(CacheBlk *blk){
+
+    if(!blk || !blk->isValid())
+        return;
+
+    uint32_t ind = blk->getSet(); 
+    Addr a = blk->getTag();
+    a = a << 6;
+    a = a | (ind & 0x3f);
+    
+    vector<Addr> new_evicts;
+    new_evicts.push_back(a);
+
+    for (int m = 0; m < oneMisses[ind].size(); m++) {
+        vector<Addr> *om = &(oneMisses[ind][m]);
+        //cout << "om #" << m << " possible evicts: " << possible_evicts << endl;
+        // evicts check
+        for (int e = 0; e < new_evicts.size(); e++) {
+            vector<Addr>::iterator in_e = std::find(om->begin(), om->begin() + om->size(), new_evicts[e]);
+            if (in_e != (om->begin() + om->size())) { // is in evicts
+                om->erase(in_e);
+                if (om->size() == 1) {
+                    new_evicts.push_back((*om)[0]);
+                    oneMisses[ind].erase(oneMisses[ind].begin() + m);
+                    break;
+                }
+            }
+        }
+    }
+ 
+    for (int e = 0; e < new_evicts.size(); e++) {
+        vector<Addr>::iterator e_in_c = std::find(in_cache[ind].begin(), in_cache[ind].end(), new_evicts[e]);
+        if (e_in_c != in_cache[ind].end()) {
+            in_cache[ind].erase(e_in_c);
+        }
+    }
+    
+    //Remvove first element so that it is not invalidated
+    //First element is the vctim so the invaildation is taken care by that
+    new_evicts.erase(new_evicts.begin());
+    
+    // evict blocks!
+    for (int e = 0; e < new_evicts.size(); e++) {
+        //cout << "evict addr: " << hex << (new_evicts[e] << 6) << endl;
+        Addr e_fetchBufferBlockPC = new_evicts[e] << 6;
+        Addr e_pc = e_fetchBufferBlockPC;
+        DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
+
+        CacheBlk *blk = tags->findBlock(e_pc, false); 
+        if(blk){
+            DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
+            cache->invalidateBlock(blk);
+        }
+    }
+
 }
 
 ReplaceableEntry*
@@ -219,7 +288,6 @@ OPT::getVictim(const ReplacementCandidates& candidates) const
     // There must be at least one replacement candidate
     assert(candidates.size() > 0);
 
-    warn("OPT victim\n");
     // Visit all candidates to find victim
     ReplaceableEntry* victim = candidates[0];
     for (const auto& candidate : candidates) {
@@ -231,6 +299,9 @@ OPT::getVictim(const ReplacementCandidates& candidates) const
             victim = candidate;
         }
     }
+    CacheBlk *blk = reinterpret_cast<CacheBlk*>(victim);
+   auto *non_const_this = const_cast<OPT*>(this);
+   non_const_this->cleanup(blk);
 
     return victim;
 }
