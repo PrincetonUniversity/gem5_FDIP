@@ -85,7 +85,7 @@ class L2(L2Cache):
     size = '256kB'
     assoc = 8
     write_buffers = 8
-    clusivity='mostly_excl'
+    #clusivity='mostly_excl'
 
 
 class L3(Cache):
@@ -203,6 +203,9 @@ class CpuCluster(SubSystem):
             iwc = None if self._wcache_type is None else self._wcache_type()
             dwc = None if self._wcache_type is None else self._wcache_type()
 
+            if self._args.l1i_size:
+                l1i.size=self._args.l1i_size
+
             if self._l1i_rp:
                 if self._l1i_rp == "LRUEmissary":
                     l1i.replacement_policy = LRUEmissaryRP()
@@ -236,9 +239,6 @@ class CpuCluster(SubSystem):
             else:
                 l1i.preserve_ways = 6
 
-            if self._args.l1i_size:
-                l1i.size=self._args.l1i_size
-
             print("adding L1 Caches")
             cpu.addPrivateSplitL1Caches(l1i, l1d, iwc, dwc)
 
@@ -258,12 +258,12 @@ class CpuCluster(SubSystem):
         else:
             self.l2.preserve_ways = 6
 
-        if self._l1i_rp == "OPT" or self._args.opt:
-            self.l2.size = '2048kB'
-            self.l2.assoc = 512
-
         if self._args.l2_size:
             self.l2.size = self._args.l2_size
+
+        if self._l1i_rp == "OPT" or self._args.opt:
+            self.l2.size = '2MB'
+            self.l2.assoc = 8
 
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
