@@ -83,6 +83,7 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     // Nayana added new replacement policy based on starvation bit
     ReplaceableEntry* victimNotSt = candidates[0];
     ReplaceableEntry* lruEntry = candidates[0];
+    ReplaceableEntry* preservedEntry;
     uint8_t numNotPreserved = 0;
     uint8_t numlru = 0;
     uint8_t numpreserve = 0;
@@ -93,6 +94,29 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
 
         if(blk->isPreserve()){
             numpreserve++;
+            if(numpreserve==1){
+                preservedEntry  = candidate;
+            }else{
+                auto candidate_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(candidate->replacementData);
+                auto victim_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(preservedEntry->replacementData);
+                uint64_t candidate_cost = candidate_repl_data->lastTouchTick;
+                uint64_t victim_cost = victim_repl_data->lastTouchTick;
+                
+                //convert tick to time
+                candidate_cost = candidate_cost/500;
+                victim_cost = victim_cost/500;
+                
+                CacheBlk *victim_blk = reinterpret_cast<CacheBlk*>(preservedEntry);
+
+                if((candidate_cost < victim_cost) && (curTick()/500 - candidate_cost > 500)){
+                    //DPRINTFN("EMISSARY: very old entry candidate_cost:%llu victim_cost:%llu\n", candidate_cost, victim_cost);
+                    preservedEntry = candidate;
+                }else if(blk->getRefCount() < victim_blk->getRefCount()){
+                    //DPRINTFN("EMISSARY: least freq entry candidate_ref_count:%d victim_ref_count:%d\n",blk->getRefCount(),victim_blk->getRefCount());
+                    preservedEntry = candidate;
+                }
+
+            }
         }else{
             // LRU of not preserved lines
             numNotPreserved++;
@@ -151,6 +175,11 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     //assert(numpreserve <= preserve_ways && "numpreserve must be less than preserve_ways\n");
 
     if(numpreserve > preserve_ways){
+        CacheBlk *victim_blk = reinterpret_cast<CacheBlk*>(preservedEntry);
+        //DPRINTFN("EMISSARY: preservedEntry: %s\n",victim_blk->print());
+        CacheBlk *lru_blk = reinterpret_cast<CacheBlk*>(lruEntry);
+        //DPRINTFN("EMISSARY: lruEntry: %s\n",lru_blk->print());
+        //return preservedEntry;
         return lruEntry;
     }else{
         return victimNotSt;
