@@ -648,6 +648,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
         mem_req2->setPaddr((*memReq_it)->getPaddr());
         mem_req2->taskId(cpu->taskId());
         PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
+        data_pkt2->setStarved(true);
         data_pkt2->setPreserve(true);
         DPRINTF(Fetch, "Fetch marking the bit as starved\n");
         icachePort.sendTimingStarvationReq(data_pkt2);
