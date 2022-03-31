@@ -201,6 +201,9 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
         Addr e_pc = e_fetchBufferBlockPC;
         DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
 
+        if(new_evicts[e] == a){
+            continue;
+        }
         CacheBlk *blk = tags->findBlock(e_pc, false); 
         if(blk){
             DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
