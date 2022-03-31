@@ -82,8 +82,8 @@ class L2(L2Cache):
     response_latency = 10
     mshrs = 32
     tgts_per_mshr = 8
-    size = '256kB'
-    assoc = 8
+    size = '1MB'
+    assoc = 16
     write_buffers = 8
     #clusivity='mostly_excl'
 
@@ -263,7 +263,7 @@ class CpuCluster(SubSystem):
 
         if self._l1i_rp == "OPT" or self._args.opt:
             self.l2.size = '2MB'
-            self.l2.assoc = 8
+            self.l2.assoc = 32
 
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
