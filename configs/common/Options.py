@@ -164,6 +164,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--emissary-enable-iq-empty", action="store_true", default=False)
     parser.add_argument("--fetchQSize", type=int, default=32)
     parser.add_argument("--ftqSize", type=int, default=0)
+    parser.add_argument("--ftqInst", type=int, default=192)
     parser.add_argument("--l1i_rp", type=str, default="LRU")
     parser.add_argument("--l2_rp", type=str, default="LRU")
     parser.add_argument("--lru_ways", type=int, default=2)

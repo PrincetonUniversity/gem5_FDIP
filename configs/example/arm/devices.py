@@ -48,21 +48,22 @@ class L1I(L1_ICache):
     tag_latency = 2
     data_latency = 2
     response_latency = 2
-    mshrs = 4
+    mshrs = 16
     tgts_per_mshr = 20
-    size = '64kB'
+    size = '32kB'
     assoc = 8
+    write_buffers = 16
 
 
 class L1D(L1_DCache):
     tag_latency = 2
     data_latency = 2
     response_latency = 2
-    mshrs = 4
+    mshrs = 16
     tgts_per_mshr = 20
     size = '64kB'
     assoc = 8
-    #write_buffers = 16
+    write_buffers = 16
 
 
 class WalkCache(PageTableWalkerCache):
@@ -70,7 +71,7 @@ class WalkCache(PageTableWalkerCache):
     data_latency = 4
     response_latency = 4
     mshrs = 6
-    tgts_per_mshr = 8
+    tgts_per_mshr = 20
     size = '1kB'
     assoc = 8
     write_buffers = 16
@@ -81,21 +82,22 @@ class L2(L2Cache):
     data_latency = 5
     response_latency = 10
     mshrs = 32
-    tgts_per_mshr = 8
+    tgts_per_mshr = 20
     size = '1MB'
     assoc = 16
-    write_buffers = 8
+    write_buffers = 32
     #clusivity='mostly_excl'
 
 
 class L3(Cache):
-    size = '16MB'
+    size = '2MB'
     assoc = 16
-    tag_latency = 20
-    data_latency = 20
+    tag_latency = 15
+    data_latency = 15
     response_latency = 20
-    mshrs = 20
-    tgts_per_mshr = 12
+    mshrs = 64
+    tgts_per_mshr = 20
+    write_buffers = 64
     clusivity='mostly_excl'
 
 
@@ -159,6 +161,9 @@ class CpuCluster(SubSystem):
 
                 if args.ftqSize >=0:
                     cpu.ftqSize = args.ftqSize
+
+                if args.ftqInst >0:
+                    cpu.ftqInst = args.ftqInst
 
                 if args.totalSimInsts:
                     cpu.totalSimInsts = args.totalSimInsts

@@ -354,7 +354,7 @@ class Fetch
      */
     bool checkSignalsAndUpdate(ThreadID tid);
 
-    TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch);
+    TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch, bool &instLimitReached);
     void preDecode();
     void addToFTQ();
     /** Does the actual fetching of instructions and passing them on to the
@@ -582,6 +582,7 @@ class Fetch
     bool sbip;
     bool resteer;
     int32_t ftqSize;
+    int32_t ftqInst;
     bool trackLastBlock;
     bool decodeIdle[MaxThreads];
     int  decodeStatus[MaxThreads];

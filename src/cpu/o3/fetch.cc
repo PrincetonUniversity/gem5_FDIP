@@ -86,6 +86,7 @@ namespace o3
 #define CACHE_LINE_SIZE 64 // line size in bytes
 #define CACHE_LISZE_SIZE_WIDTH 6 // number of bits
 #define ICACHE_ACCESS_LATENCY 2 // in cycles
+#define INST_SIZE 4 // in bytes
 enum Repl {ORACLE, LRU, RANDOM, NONE};
 //enum Repl REPL = ORACLE; // sets replacement policy
 vector<vector<Addr> > oneMisses[SETS];
@@ -150,6 +151,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       pureRandom(params.pureRandom),
       histRandom(params.histRandom),
       ftqSize(params.ftqSize),
+      ftqInst(params.ftqInst),
       trackLastBlock(false),
       numSets(params.numSets),
       finishTranslationEvent(this), fetchStats(_cpu, this)
@@ -2068,7 +2070,7 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
 }
 
 TheISA::PCState
-Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch)
+Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch, bool &instLimitReached)
 {
     TheISA::PCState predictPC = prefetchPc;
     if (!branchPred->getBblValid(prefetchPc.instAddr(), tid))
@@ -2094,6 +2096,26 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
             DPRINTF(Fetch, "Fix this case later\n");
             return 0;
         }
+
+        uint64_t num_insts = (branchPC.instAddr() - prefetchPc.instAddr());
+
+        num_insts = (num_insts/INST_SIZE) + 1;
+
+        std::deque<int>::iterator it_sz = prefetchQueueBblSize[tid].begin();
+        // Bandwidth check: max lines is 16*ftqSize
+        while (it_sz!= prefetchQueueBblSize[tid].end()) {
+            num_insts += ((*it_sz/INST_SIZE) + 1); 
+            it_sz++;
+        }
+
+        DPRINTF(Fetch, "insts pre-fetched %llu\n",num_insts);
+        if(num_insts > ftqInst){
+            DPRINTF(Fetch, "ftqInst limit reached\n");
+            instLimitReached = true;
+            return 0;
+        }
+
+        //TODO: Add FTQ inst limit here
 
         TheISA::PCState nextPC=branchPC;
         DPRINTF(Fetch,"nextPC instAddr is %#x\n",nextPC.instAddr());
@@ -2388,7 +2410,11 @@ Fetch::addToFTQ()
     // Keep issuing while prefetchQueue is available
     while ( prefetchQueue[tid].size() < ftqSize ) {
         bool stopPrefetch = false;
-        nextPC = predictNextBasicBlock(thisPC, branchPC, tid, stopPrefetch);
+        bool limitReached = false;
+        nextPC = predictNextBasicBlock(thisPC, branchPC, tid, stopPrefetch, limitReached);
+        if(limitReached){
+            return;
+        }
 
         if (nextPC.instAddr()>0x10) {
             TheISA::PCState prevPrefPC = prefPC[tid];;
