@@ -1025,7 +1025,12 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         //warn("VERIFY: Self modifying corner case found! %llu\n",curTick());
         // When predictor is invoked reset prefetching
         prefPC[tid] = nextPC; 
-        lastPrefPC = 0; 
+        if(!predict_taken){
+            DPRINTF(Fetch, "PREDICT NOT TAKEN DISABLE PREFETCHING\n");
+            prefPC[tid] = 0;
+        }
+        //lastPrefPC = prefPC[tid]; 
+        lastPrefPC = 0;
         prefetchQueue[tid].clear();
         prefetchQueueBblSize[tid].clear();
         prefetchQueueSeqNum[tid].clear();
@@ -2205,6 +2210,7 @@ Fetch::preDecode(){
     //If the line is same as the prefPC line then predcode it and update
     //BTB
 
+    DPRINTF(Fetch, "lastPrefPC is %s\n", lastPrefPC);
     if(lastPrefPC == 0){
       return;
     }
@@ -2396,7 +2402,7 @@ Fetch::addToFTQ()
         return;
     }
     //assert(prefPC[tid].instAddr() != 0 && "prefPC cannot be 0\n");
-    preDecode();
+    //preDecode();
     // The current Prefetch PC.
     TheISA::PCState thisPC = prefPC[tid];
     TheISA::PCState nextPC = thisPC;
@@ -2474,31 +2480,39 @@ Fetch::addToFTQ()
                 lastProcessedLine = 0;
             }
 
-            if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
-                if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
-                    do{
-                        //if(lastAddrFetched != curPCLine){
-                            if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
-                                DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
-                                prefetchBufferPC[tid].push_back(curPCLine);
-                                lastAddrFetched = curPCLine;
-                            }else if(prefetchBufferPC[tid].empty()){
-                                if(curPCLine != lastAddrFetched){
-                                    DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+            //Special case: when lastProcessedLine is same as branchPC then do not insert these lines for prefetching
+
+            if(lastProcessedLine == branchPCLine){
+                DPRINTF(Fetch, "ALREADY PROCESSED\n");
+                lastProcessedLine = 0;
+                //lastPrefPC = 0;
+            }else{
+                if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
+                    if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
+                        do{
+                            //if(lastAddrFetched != curPCLine){
+                                if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                                    DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                     prefetchBufferPC[tid].push_back(curPCLine);
                                     lastAddrFetched = curPCLine;
+                                }else if(prefetchBufferPC[tid].empty()){
+                                    if(curPCLine != lastAddrFetched){
+                                        DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                        prefetchBufferPC[tid].push_back(curPCLine);
+                                        lastAddrFetched = curPCLine;
+                                    }
                                 }
-                            }
-                        //}
+                            //}
+                            DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
+                            curPCLine += CACHE_LINE_SIZE;
+                            //if(curPCLine > branchPCLine){
+                            //  break;
+                            //}
+                        }while(curPCLine <= branchPCLine);
                         DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
-                        curPCLine += CACHE_LINE_SIZE;
-                        //if(curPCLine > branchPCLine){
-                        //  break;
-                        //}
-                    }while(curPCLine <= branchPCLine);
-                    DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
-                }else{
-                    DPRINTF(Fetch, "Size mismatch branchPC: %s thisPC: %s\n", branchPC, thisPC);
+                    }else{
+                        DPRINTF(Fetch, "Size mismatch branchPC: %s thisPC: %s\n", branchPC, thisPC);
+                    }
                 }
             }
             
@@ -2541,6 +2555,7 @@ Fetch::addToFTQ()
             lastProcessedLine = 0;
         } else{
         
+            break;
             //FIXME: prefPC line here and set lastAddrFetched
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
             
@@ -2551,11 +2566,11 @@ Fetch::addToFTQ()
             //    fallThroughPrefPC = prefPC[tid].instAddr();
             //}
 
-            if(lastProcessedLine == 0 && prefetchBufferPC[tid].empty()){
-                lastProcessedLine = lastAddrFetched;
-                DPRINTF(Fetch, "PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid].instAddr());
-                DPRINTF(Fetch, "Fixing lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
-            }
+            //if(lastProcessedLine == 0 && prefetchBufferPC[tid].empty()){
+            //    lastProcessedLine = lastAddrFetched;
+            //    DPRINTF(Fetch, "PREF BUF EMPTY for prefPC:%#x\n",prefPC[tid].instAddr());
+            //    DPRINTF(Fetch, "Fixing lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
+            //}
 
             if ((lastProcessedLine !=0 && lastProcessedLine == lastAddrFetched)){
                 DPRINTF(Fetch, "Last line\n");
@@ -2694,6 +2709,7 @@ Fetch::fetch(bool &status_change)
 
             if(fetchBufferValid[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front()){
                 warn("This case should not happend fetchBufferBlockPC:%#x fetchBufferPC[tid]:%#x curTick:%llu\n", fetchBufferBlockPC, fetchBufferPC[tid].front(), curTick());
+                DPRINTF(Fetch, "This case should not happend fetchBufferBlockPC:%#x fetchBufferPC[tid]:%#x curTick:%llu\n", fetchBufferBlockPC, fetchBufferPC[tid].front(), curTick());
             }
             DPRINTF(Fetch, "[tid:%i] Attempting to translate and read "
                     "instruction, starting at PC %s fetchAddr: %#x fetchBufferBlockPC: %#x pcOffset: %d\n", tid, thisPC, fetchAddr, fetchBufferBlockPC, pcOffset);
@@ -3145,6 +3161,8 @@ Fetch::fetch(bool &status_change)
             //for ( auto pref_pc_it : prefetchBufferPC[tid]){
             //    DPRINTFN("prefetchBufferPC %#x\n", pref_pc_it);
             //}
+            warn("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+            DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             prefetchQueue[tid].clear();
             prefetchQueueBblSize[tid].clear();
             prefetchQueueSeqNum[tid].clear();
@@ -3155,7 +3173,6 @@ Fetch::fetch(bool &status_change)
             fetchBufferReqPtr[tid].clear();
             fetchBufferValid[tid].clear();
             memReq[tid].clear();
-            //DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             lastProcessedLine = 0;
             lastAddrFetched = 0;
             fallThroughPrefPC = 0;
@@ -3377,7 +3394,7 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
         lastAddrFetched = curPCLine;
         //lastPrefPC = thisPC;
         //prefPC[tid] = thisPC;
-        lastPrefPC = 0; 
+        lastPrefPC = prefPC[tid]; 
         lastProcessedLine = 0;
         //prefPC[tid] = pc[tid];
     }
