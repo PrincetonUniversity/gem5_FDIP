@@ -1025,9 +1025,12 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         //warn("VERIFY: Self modifying corner case found! %llu\n",curTick());
         // When predictor is invoked reset prefetching
         prefPC[tid] = nextPC; 
+        fallThroughPrefPC = 0;
         if(!predict_taken){
-            DPRINTF(Fetch, "PREDICT NOT TAKEN DISABLE PREFETCHING\n");
-            prefPC[tid] = 0;
+            //DPRINTF(Fetch, "PREDICT NOT TAKEN DISABLE PREFETCHING\n");
+            //prefPC[tid] = 0;
+            fallThroughPrefPC = prefPC[tid].instAddr();
+            DPRINTF(Fetch, "Setting fallThroughPrefPC %#x\n", fallThroughPrefPC);
         }
         //lastPrefPC = prefPC[tid]; 
         lastPrefPC = 0;
@@ -1038,7 +1041,6 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         lastProcessedLine = 0;
         //Fix this later
         lastAddrFetched = prefetchBufferPC[tid].front(); 
-        fallThroughPrefPC = 0;
         //Flush everything except head
         prefetchBufferPC[tid].erase(++prefetchBufferPC[tid].begin(),prefetchBufferPC[tid].end());
         fetchBuffer[tid].erase(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
@@ -2513,6 +2515,33 @@ Fetch::addToFTQ()
                     }else{
                         DPRINTF(Fetch, "Size mismatch branchPC: %s thisPC: %s\n", branchPC, thisPC);
                     }
+                }else{
+                    // When fall through PC is same as prevPrefPC skip lines till lastAddrFetched
+                    if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
+                        do{
+                            if(curPCLine > lastAddrFetched){
+                                if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
+                                    DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                    prefetchBufferPC[tid].push_back(curPCLine);
+                                    lastAddrFetched = curPCLine;
+                                }else if(prefetchBufferPC[tid].empty()){
+                                    if(curPCLine != lastAddrFetched){
+                                        DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
+                                        prefetchBufferPC[tid].push_back(curPCLine);
+                                        lastAddrFetched = curPCLine;
+                                    }
+                                }
+                            }
+                            DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
+                            curPCLine += CACHE_LINE_SIZE;
+                            //if(curPCLine > branchPCLine){
+                            //  break;
+                            //}
+                        }while(curPCLine <= branchPCLine);
+                        DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
+                    }else{
+                        DPRINTF(Fetch, "Size mismatch branchPC: %s thisPC: %s\n", branchPC, thisPC);
+                    }                
                 }
             }
             
@@ -3383,8 +3412,20 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     //if (prefetchQueue[tid].empty()) {
     //    return;
     //}
+    
+    if(!prefetchBufferPC[tid].empty()){
+        TheISA::PCState thisPC = pc[tid];
+        Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+        curPCLine &= decoder[tid]->pcMask(); 
+        if(curPCLine != prefetchBufferPC[tid].front()){
+            warn("BUG! fetch at %#x and prefetchBuffer at %#x tick: %llu\n",thisPC.instAddr(), prefetchBufferPC[tid].front(), curTick());
+            DPRINTF(Fetch, "BUG! fetch at %#x and prefetchBuffer at %#x tick: %llu\n",thisPC.instAddr(), prefetchBufferPC[tid].front(), curTick());
+        }
+    
+    }
     // If prefetch buffer is empty then fetch head of the PC and memReq queue is empty
-    if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
+    //if (prefetchBufferPC[tid].empty() && prefetchQueue[tid].empty()){
+    if (prefetchBufferPC[tid].empty()){
         DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
@@ -3398,7 +3439,7 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
         lastProcessedLine = 0;
         //prefPC[tid] = pc[tid];
     }
-
+        
     if (prefetchBufferPC[tid].empty()) {
         return;
     }
