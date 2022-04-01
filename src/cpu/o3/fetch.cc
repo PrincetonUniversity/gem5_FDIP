@@ -2487,7 +2487,7 @@ Fetch::addToFTQ()
             if(lastProcessedLine == branchPCLine){
                 DPRINTF(Fetch, "ALREADY PROCESSED\n");
                 lastProcessedLine = 0;
-                //lastPrefPC = 0;
+                lastPrefPC = 0;
             }else{
                 if ( prevPrefPC.instAddr() != fallThroughPrefPC) {
                     if(tempBblSize == (branchPC.instAddr() - thisPC.instAddr())){
@@ -2584,12 +2584,31 @@ Fetch::addToFTQ()
             lastProcessedLine = 0;
         } else{
         
-            break;
+            //When BBL is not found pre-fetch target and following two lines
+
             //FIXME: prefPC line here and set lastAddrFetched
             DPRINTF(Fetch, "lastProcessedLine %#x and lastAddrFetched %#x\n",lastProcessedLine, lastAddrFetched);
             
             Addr fetchAddr = prefPC[tid].instAddr() & decoder[tid]->pcMask();
             Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+
+            Addr prefetchPCLine = 0; 
+            if(lastAddrFetched == fetchBufferBlockPC){
+                prefetchPCLine = fetchBufferBlockPC + CACHE_LINE_SIZE;
+            }else{
+                prefetchPCLine = fetchBufferBlockPC; 
+            }
+
+            prefetchBufferPC[tid].push_back(prefetchPCLine);
+            prefetchBufferPC[tid].push_back(prefetchPCLine + CACHE_LINE_SIZE);
+
+            lastAddrFetched = prefetchPCLine + CACHE_LINE_SIZE;
+
+            //Stop prefetching till new branch is found
+            prefPC[tid]=0;
+            lastPrefPC = 0;
+
+            break;
             //if ( lastProcessedLine !=0 && lastProcessedLine != lastAddrFetched && lastAddrFetched == fetchBufferBlockPC){
             //    DPRINTF(Fetch, "Get Falthrough next time\n");
             //    fallThroughPrefPC = prefPC[tid].instAddr();
@@ -3190,7 +3209,7 @@ Fetch::fetch(bool &status_change)
             //for ( auto pref_pc_it : prefetchBufferPC[tid]){
             //    DPRINTFN("prefetchBufferPC %#x\n", pref_pc_it);
             //}
-            warn("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+            //warn("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             prefetchQueue[tid].clear();
             prefetchQueueBblSize[tid].clear();
