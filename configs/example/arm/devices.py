@@ -150,6 +150,9 @@ class CpuCluster(SubSystem):
                 if args.randomStarve:
                     cpu.randomStarve = args.randomStarve
 
+                if args.starveRandomness:
+                    cpu.starveRandomness = args.starveRandomness
+
                 if args.pureRandom:
                     cpu.pureRandom = args.pureRandom
 
@@ -214,6 +217,12 @@ class CpuCluster(SubSystem):
             if self._l1i_rp:
                 if self._l1i_rp == "LRUEmissary":
                     l1i.replacement_policy = LRUEmissaryRP()
+                    l1i.lru_ways = 2
+                    if self._preserve_ways:
+                        l1i.preserve_ways = self._preserve_ways
+                        l1i.lru_ways = 8 - int(self._preserve_ways)
+                    else:
+                        l1i.preserve_ways = 6
                 elif self._l1i_rp == "OPT":
                     l1i.replacement_policy = OPTRP()
                     l1i.assoc = 256
@@ -237,12 +246,6 @@ class CpuCluster(SubSystem):
                 l1i.assoc = 256
                 l1i.size = '1024kB'
 
-            l1i.lru_ways = 2
-            if self._preserve_ways:
-                l1i.preserve_ways = self._preserve_ways
-                l1i.lru_ways = 8 - int(self._preserve_ways)
-            else:
-                l1i.preserve_ways = 6
 
             print("adding L1 Caches")
             cpu.addPrivateSplitL1Caches(l1i, l1d, iwc, dwc)
@@ -255,13 +258,13 @@ class CpuCluster(SubSystem):
 
         if self._l2_rp == "LRUEmissary":
             self.l2.replacement_policy = LRUEmissaryRP()
-
-        self.l2.lru_ways = 2
-        if self._preserve_ways:
-            self.l2.preserve_ways = self._preserve_ways
-            self.l2.lru_ways = 8 - int(self._preserve_ways)
-        else:
-            self.l2.preserve_ways = 6
+            self.l2.lru_ways = 2
+            if self._preserve_ways:
+                self.l2.preserve_ways = self._preserve_ways
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+            else:
+                self.l2.preserve_ways = 6
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size
@@ -269,6 +272,9 @@ class CpuCluster(SubSystem):
         if self._l1i_rp == "OPT" or self._args.opt:
             self.l2.size = '2MB'
             self.l2.assoc = 32
+
+        #NLPClass = ObjectList.hwp_list.get('TaggedPrefetcher')
+        #self.l2.prefetcher = NLPClass()
 
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
