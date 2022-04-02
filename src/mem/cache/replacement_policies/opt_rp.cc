@@ -82,12 +82,12 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
     //unsigned int ind = (unsigned)(a & 0x3f);
     uint32_t ind = blk->getSet(); 
     Addr a = blk->getTag();
-    DPRINTFN("OPT:touch TAG is %#x\n",a);
-    DPRINTFN("OPT:touch set:%d and way:%d\n",blk->getSet(), blk->getWay());
+    //DPRINTFN("OPT:touch TAG is %#x\n",a);
+    //DPRINTFN("OPT:touch set:%d and way:%d\n",blk->getSet(), blk->getWay());
     a = a << 6;
     a = a | (ind & 0x3f);
     // check oneMisses
-    DPRINTFN("OPT:touch addr is %#x\n", (a << 6));
+    //DPRINTFN("OPT:touch addr is %#x\n", (a << 6));
     vector<Addr> new_evicts;
     int possible_evicts = 1;
     int last_size = 0;
@@ -199,14 +199,14 @@ OPT::touch(const std::shared_ptr<ReplacementData>& replacement_data)
         //cout << "evict addr: " << hex << (new_evicts[e] << 6) << endl;
         Addr e_fetchBufferBlockPC = new_evicts[e] << 6;
         Addr e_pc = e_fetchBufferBlockPC;
-        DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
+        //DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
 
         if(new_evicts[e] == a){
             continue;
         }
         CacheBlk *blk = tags->findBlock(e_pc, false); 
         if(blk){
-            DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
+            //DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
             cache->invalidateBlock(blk);
         }
     }
@@ -274,11 +274,11 @@ OPT::cleanup(CacheBlk *blk){
         //cout << "evict addr: " << hex << (new_evicts[e] << 6) << endl;
         Addr e_fetchBufferBlockPC = new_evicts[e] << 6;
         Addr e_pc = e_fetchBufferBlockPC;
-        DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
+        //DPRINTFN("OPT:touch evict addr is %#x\n",e_pc);
 
         CacheBlk *blk = tags->findBlock(e_pc, false); 
         if(blk){
-            DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
+            //DPRINTFN("OPT:touch blk found set:%#x tag:%#x\n",blk->getSet(), blk->getTag());
             cache->invalidateBlock(blk);
         }
     }
