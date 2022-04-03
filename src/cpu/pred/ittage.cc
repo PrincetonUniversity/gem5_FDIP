@@ -251,8 +251,8 @@ void
 ITTAGE::recordIndirect(Addr br_addr, Addr tgt_addr, InstSeqNum seq_num,
                        ThreadID tid)
 {
-    HistoryEntry entry(br_addr, tgt_addr, seq_num);
-    threadHistory[tid].pathHist.push_back(entry);
+    //HistoryEntry entry(br_addr, tgt_addr, seq_num);
+    //threadHistory[tid].pathHist.push_back(entry);
 }
 
 void
@@ -378,8 +378,8 @@ ITTAGE::gtag(ThreadID tid, unsigned int pc, int bank, bool at_fetch)
 int
 ITTAGE::getRandom() const
 {
-    return 1; // TODO - REMOVE ME after correlation...
-    // return random_mt.random<int>();
+    //return 1; // TODO - REMOVE ME after correlation...
+    return random_mt.random<int>();
 }
 
 // Predictor update
@@ -569,6 +569,8 @@ ITTAGE::updateBrIndirect(Addr branch_pc, uint16_t br_type, bool taken,
 
     // Update retire history path
     historyUpdate(tid, branch_pc, taken, indirect_history, target, false);
+
+    delete bi;
 }
 
 void 
