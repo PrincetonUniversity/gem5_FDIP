@@ -298,7 +298,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                 predict_record.wasIndirect = true;
                 ++stats.indirectLookups;
                 //Consult indirect predictor on indirect control
-                if (iPred->lookup(pc.instAddr(), target, tid)) {
+                if (iPred->lookup(pc.instAddr(), target, tid, indirect_history)) {
                     // Indirect predictor hit
                     ++stats.indirectHits;
                     DPRINTF(Branch,
@@ -343,7 +343,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
         // the new information
         // Note also that we use orig_pred_taken instead of pred_taken in
         // as this is the actual outcome of the direction prediction
-        iPred->updateDirectionInfo(tid, orig_pred_taken);
+        iPred->updateDirectionInfo(tid, orig_pred_taken, indirect_history);
     }
 
     predHist[tid].push_front(predict_record);
@@ -478,7 +478,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                 predict_record.wasIndirect = true;
                 ++stats.indirectLookups;
                 //Consult indirect predictor on indirect control
-                if (iPred->lookup(pc.instAddr(), target, tid)) {
+                if (iPred->lookup(pc.instAddr(), target, tid, indirect_history)) {
                     // Indirect predictor hit
                     ++stats.indirectHits;
                     TheISA::PCState indirectBrTarget = pc;
@@ -509,6 +509,9 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                 }
                 iPred->recordIndirect(pc.instAddr(), target.instAddr(), seqNum,
                         tid);
+                iPred->historyUpdate(tid, pc.instAddr(), pred_taken,
+                        indirect_history, inst,
+                        target.instAddr());
             }
         }
     } else {
@@ -527,7 +530,7 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
         // the new information
         // Note also that we use orig_pred_taken instead of pred_taken in
         // as this is the actual outcome of the direction prediction
-        iPred->updateDirectionInfo(tid, orig_pred_taken);
+        iPred->updateDirectionInfo(tid, orig_pred_taken, indirect_history);
     }
 
     predHist[tid].push_front(predict_record);

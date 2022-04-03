@@ -76,7 +76,7 @@ SimpleIndirectPredictor::genIndirectInfo(ThreadID tid,
 
 void
 SimpleIndirectPredictor::updateDirectionInfo(
-    ThreadID tid, bool actually_taken)
+    ThreadID tid, bool actually_taken, void *& indirect_history)
 {
     threadInfo[tid].ghr <<= 1;
     threadInfo[tid].ghr |= actually_taken;
@@ -94,7 +94,7 @@ SimpleIndirectPredictor::changeDirectionPrediction(ThreadID tid,
 
 bool
 SimpleIndirectPredictor::lookup(Addr br_addr, TheISA::PCState& target,
-    ThreadID tid)
+    ThreadID tid, void *& bp_history)
 {
     DPRINTF(Indirect, "Indirect GHR is %u\n",threadInfo[tid].ghr);
     Addr set_index = getSetIndex(br_addr, threadInfo[tid].ghr, tid);

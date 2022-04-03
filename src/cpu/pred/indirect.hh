@@ -32,6 +32,7 @@
 #include "arch/pcstate.hh"
 #include "config/the_isa.hh"
 #include "cpu/inst_seq.hh"
+#include "cpu/static_inst.hh"
 #include "params/IndirectPredictor.hh"
 #include "sim/sim_object.hh"
 
@@ -53,7 +54,7 @@ class IndirectPredictor : public SimObject
     }
 
     virtual bool lookup(Addr br_addr, TheISA::PCState& br_target,
-                        ThreadID tid) = 0;
+                        ThreadID tid, void *& bp_history) = 0;
     virtual void recordIndirect(Addr br_addr, Addr tgt_addr,
                                 InstSeqNum seq_num, ThreadID tid) = 0;
     virtual void commit(InstSeqNum seq_num, ThreadID tid,
@@ -62,11 +63,15 @@ class IndirectPredictor : public SimObject
     virtual void recordTarget(InstSeqNum seq_num, void * indirect_history,
                               const TheISA::PCState& target, ThreadID tid) = 0;
     virtual void genIndirectInfo(ThreadID tid, void* & indirect_history) = 0;
-    virtual void updateDirectionInfo(ThreadID tid, bool actually_taken) = 0;
+    virtual void updateDirectionInfo(ThreadID tid, bool actually_taken, void *& indirect_history) = 0;
     virtual void deleteIndirectInfo(ThreadID tid, void * indirect_history) = 0;
     virtual void changeDirectionPrediction(ThreadID tid,
                                            void * indirect_history,
                                            bool actually_taken) = 0;
+    virtual void historyUpdate(ThreadID tid, Addr branch_pc, bool taken,
+                       void * bp_history, const StaticInstPtr & inst,
+                       Addr target) = 0;
+
 };
 
 } // namespace branch_prediction

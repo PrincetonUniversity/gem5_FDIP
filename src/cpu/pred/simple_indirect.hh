@@ -47,7 +47,7 @@ class SimpleIndirectPredictor : public IndirectPredictor
   public:
     SimpleIndirectPredictor(const SimpleIndirectPredictorParams &params);
 
-    bool lookup(Addr br_addr, TheISA::PCState& br_target, ThreadID tid);
+    bool lookup(Addr br_addr, TheISA::PCState& br_target, ThreadID tid, void *& bp_history);
     void recordIndirect(Addr br_addr, Addr tgt_addr, InstSeqNum seq_num,
                         ThreadID tid);
     void commit(InstSeqNum seq_num, ThreadID tid, void * indirect_history);
@@ -55,10 +55,14 @@ class SimpleIndirectPredictor : public IndirectPredictor
     void recordTarget(InstSeqNum seq_num, void * indirect_history,
                       const TheISA::PCState& target, ThreadID tid);
     void genIndirectInfo(ThreadID tid, void* & indirect_history);
-    void updateDirectionInfo(ThreadID tid, bool actually_taken);
+    void updateDirectionInfo(ThreadID tid, bool actually_taken, void *& indirect_history);
     void deleteIndirectInfo(ThreadID tid, void * indirect_history);
     void changeDirectionPrediction(ThreadID tid, void * indirect_history,
                                    bool actually_taken);
+    void historyUpdate(ThreadID tid, Addr branch_pc, bool taken,
+                       void * bp_history, const StaticInstPtr & inst,
+                       Addr target) {}
+
 
   private:
     const bool hashGHR;
