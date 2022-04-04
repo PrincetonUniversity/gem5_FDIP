@@ -114,19 +114,19 @@ DynInst::~DynInst()
                      this->seqNum,
                      this->staticInst->disassemble(this->instAddr()));
 
-            // cms11
-            val = (this->memsentTick == -1) ? 0 : this->memsentTick;
-            DPRINTFR(O3PipeView, "O3PipeView:memsent:%llu\n", val);
-            val = (this->memrecvTick == -1) ? 0 : this->memrecvTick;
-            DPRINTFR(O3PipeView, "O3PipeView:memrecv:%llu:%d:%d:\n", val, this->memlevel, this->buf);
-            DPRINTFR(O3PipeView, "starve:0x%08llx:%d:%d:\n", this->instAddr(), this->memlevel, this->starve);
+            //// cms11
+            //val = (this->memsentTick == -1) ? 0 : this->memsentTick;
+            //DPRINTFR(O3PipeView, "O3PipeView:memsent:%llu\n", val);
+            //val = (this->memrecvTick == -1) ? 0 : this->memrecvTick;
+            //DPRINTFR(O3PipeView, "O3PipeView:memrecv:%llu:%d:%d:\n", val, this->memlevel, this->buf);
+            //DPRINTFR(O3PipeView, "O3PipeView:starve:0x%08llx:%d:%d:\n", this->instAddr(), this->memlevel, this->starve);
  
-            if (this->isControl()) {
-                DPRINTFR(O3PipeView, "O3PipeView:cacheHitMiss:\n");
-            } else {
-                DPRINTFR(O3PipeView, "O3PipeView:queueOcc:\n");
-            }
-            // end cms11
+            //if (this->isControl()) {
+            //    DPRINTFR(O3PipeView, "O3PipeView:cacheHitMiss:\n");
+            //} else {
+            //    DPRINTFR(O3PipeView, "O3PipeView:queueOcc:\n");
+            //}
+            //// end cms11
 
             val = (this->decodeTick == -1) ? 0 : fetch + this->decodeTick;
             DPRINTFR(O3PipeView, "O3PipeView:decode:%llu\n", val);
