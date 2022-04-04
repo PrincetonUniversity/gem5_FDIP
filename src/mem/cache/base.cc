@@ -374,6 +374,7 @@ BaseCache::recvTimingWouldHaveStarved(PacketPtr pkt)
 
     invalidateBlock(blk);
     // evictBlock(blk, writebacks);
+    delete pkt;
     return true;
 
 }
