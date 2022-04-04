@@ -79,10 +79,10 @@ class BranchPredictor(SimObject):
     RASSize = Param.Unsigned(16, "RAS size")
     instShiftAmt = Param.Unsigned(2, "Number of bits to shift instructions by")
 
-    #indirectBranchPred = Param.IndirectPredictor(SimpleIndirectPredictor(),
-    #  "Indirect branch predictor, set to NULL to disable indirect predictions")
-    indirectBranchPred = Param.IndirectPredictor(ITTAGE(),
+    indirectBranchPred = Param.IndirectPredictor(SimpleIndirectPredictor(),
       "Indirect branch predictor, set to NULL to disable indirect predictions")
+    #indirectBranchPred = Param.IndirectPredictor(ITTAGE(),
+    #  "Indirect branch predictor, set to NULL to disable indirect predictions")
 
 class LocalBP(BranchPredictor):
     type = 'LocalBP'
