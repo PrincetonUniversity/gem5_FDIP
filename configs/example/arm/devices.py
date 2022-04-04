@@ -194,7 +194,13 @@ class CpuCluster(SubSystem):
                 cpu.branchPred = bpClass()
                 if args.btb_entries:
                     cpu.branchPred.BTBEntries = args.btb_entries
+                indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
+                cpu.branchPred.indirectBranchPred = indirectBPClass()
 
+            #if args.indirect_bp_type:
+            #    indirectBPClass = ObjectList.indirect_bp_list.get(args.indirect_bp_type)
+            #    indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
+            #    cpu.branchPred.indirectBranchPred = indirectBPClass()
 
         system.addCpuCluster(self, num_cpus)
 
