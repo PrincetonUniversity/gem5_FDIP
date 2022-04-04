@@ -160,6 +160,9 @@ class ITTAGE: public IndirectPredictor
             ct0 = ci + sz;
             ct1 = ct0 + sz;
         }
+        ~ITTageBranchInfo(){
+            delete this->storage;
+        }
     };
 
     // "Use alternate prediction on weak predictions": a 4-bit counter to
