@@ -87,6 +87,10 @@ extern std::deque<TheISA::PCState> prefetchQueueBr[FTQ_MAX_SIZE];
 class Fetch
 {
   public:
+    typedef typename std::list<uint8_t*>::iterator bufIt;
+    typedef typename std::list<Addr>::iterator pcIt;
+    typedef typename std::list<bool>::iterator validIt;
+    typedef typename std::list<RequestPtr>::iterator reqIt;
     /**
      * IcachePort class for instruction fetch.
      */
@@ -357,6 +361,7 @@ class Fetch
     TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch, bool &instLimitReached);
     void preDecode();
     void addToFTQ();
+    template<typename IterType> void cleanupFetchBuffer(IterType it, IterType end);
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
      * @param status_change fetch() sets this variable if there was a status
@@ -511,10 +516,6 @@ class Fetch
     /** Mask to align a fetch address to a fetch buffer boundary. */
     Addr fetchBufferMask;
 
-    typedef typename std::list<uint8_t*>::iterator bufIt;
-    typedef typename std::list<Addr>::iterator pcIt;
-    typedef typename std::list<bool>::iterator validIt;
-    typedef typename std::list<RequestPtr>::iterator reqIt;
     /** The fetch data that is being fetched and buffered. */
     //uint8_t *fetchBuffer[MaxThreads];
     std::list<uint8_t*> fetchBuffer[MaxThreads];

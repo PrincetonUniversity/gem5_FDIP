@@ -1043,6 +1043,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         lastAddrFetched = prefetchBufferPC[tid].front(); 
         //Flush everything except head
         prefetchBufferPC[tid].erase(++prefetchBufferPC[tid].begin(),prefetchBufferPC[tid].end());
+        cleanupFetchBuffer(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBuffer[tid].erase(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBufferPC[tid].erase(++fetchBufferPC[tid].begin(), fetchBufferPC[tid].end());
         fetchBufferReqPtr[tid].erase(++fetchBufferReqPtr[tid].begin(),fetchBufferReqPtr[tid].end());
@@ -1137,6 +1138,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
         prefetchBufferPC[tid].clear();
+        cleanupFetchBuffer(fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
         fetchBufferReqPtr[tid].clear();
@@ -1159,6 +1161,11 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     FetchTranslation *trans = new FetchTranslation(this);
     cpu->mmu->translateTiming(mem_req, cpu->thread[tid]->getTC(),
                               trans, BaseMMU::Execute);
+    //Fault e_fault = cpu->mmu->translateFunctional(mem_req, cpu->thread[tid]->getTC(),
+    //                           BaseMMU::Execute);
+    //if(e_fault == NoFault){
+    //    finishTranslation(e_fault, mem_req);
+    //}
 
    return true;
 }
@@ -1254,6 +1261,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         // Access the cache.
         if(enablePerfectICache){
             icachePort.sendFunctional(data_pkt);
+            //icachePort.sendAtomic(data_pkt);
             DPRINTF(Fetch, "[tid:%i] Doing Icache access.\n", tid);
             DPRINTF(Activity, "[tid:%i] Activity: Waiting on I-cache "
                     "response.\n", tid);
@@ -1302,6 +1310,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                              DPRINTF(Fetch, "Req failed erasing pkt with pc %#x\n", *pc_it);
                              fetchBufferPC[tid].erase(pc_it, fetchBufferPC[tid].end());
                              fetchBufferValid[tid].erase(val_it, fetchBufferValid[tid].end());
+                             cleanupFetchBuffer(buf_it ,fetchBuffer[tid].end());
                              fetchBuffer[tid].erase(buf_it, fetchBuffer[tid].end());
                              fetchBufferReqPtr[tid].erase(req_it, fetchBufferReqPtr[tid].end());
                              memReqListIt memReq_it = std::find(memReq[tid].begin(),memReq[tid].end(), mem_req);
@@ -1368,6 +1377,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                      //DPRINTFN("Translation Fault erasing pkt with pc %#x\n", *pc_it);
                      fetchBufferPC[tid].erase(pc_it, fetchBufferPC[tid].end());
                      fetchBufferValid[tid].erase(val_it, fetchBufferValid[tid].end());
+                     cleanupFetchBuffer(buf_it ,fetchBuffer[tid].end());
                      fetchBuffer[tid].erase(buf_it, fetchBuffer[tid].end());
                      fetchBufferReqPtr[tid].erase(req_it, fetchBufferReqPtr[tid].end());
                      //empty prefetchBufferPC so that the request is not sent again
@@ -1523,6 +1533,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         //for ( auto &buf_it : fetchBuffer[tid]){
         //    delete &*buf_it;
         //}
+        cleanupFetchBuffer(fetchBuffer[tid].begin() ,fetchBuffer[tid].end());
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
         fetchBufferReqPtr[tid].clear();
@@ -1533,6 +1544,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         //for ( auto &buf_it : fetchBuffer[tid]){
         //    delete &*buf_it;
         //}
+        cleanupFetchBuffer(fetchBuffer[tid].begin() ,fetchBuffer[tid].end());
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
         fetchBufferReqPtr[tid].clear();
@@ -3191,6 +3203,7 @@ Fetch::fetch(bool &status_change)
     if (fetchBufferPC[tid].size()>0 && fetchBufferBlockPC != fetchBufferPC[tid].front()) {
         assert(!curMacroop && "Curmacroop should not be not null!");
         fetchBufferPC[tid].pop_front();
+        delete fetchBuffer[tid].front();
         fetchBuffer[tid].pop_front();
         fetchBufferValid[tid].pop_front();
         fetchBufferReqPtr[tid].pop_front();
@@ -3211,11 +3224,16 @@ Fetch::fetch(bool &status_change)
             //}
             //warn("Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
             DPRINTF(Fetch, "Front is still not same. fetchBufferBlockPC: %#x fetchBufferPC: %#x\n", fetchBufferBlockPC, fetchBufferPC[tid].front());
+
+            // Do not clear these queues here or else
+            //stale branches will not be squashed
             prefetchQueue[tid].clear();
             prefetchQueueBblSize[tid].clear();
             prefetchQueueSeqNum[tid].clear();
             prefetchQueueBr[tid].clear();
+
             prefetchBufferPC[tid].clear();
+            cleanupFetchBuffer(fetchBuffer[tid].begin() ,fetchBuffer[tid].end());
             fetchBuffer[tid].clear();
             fetchBufferPC[tid].clear();
             fetchBufferReqPtr[tid].clear();
@@ -3672,7 +3690,7 @@ Fetch::IcachePort::recvTimingResp(PacketPtr pkt)
     if(!fetch->enablePerfectICache){
         fetch->processCacheCompletion(pkt);
     }else{
-        //delete pkt;
+        delete pkt;
     }
 
 
@@ -3684,6 +3702,14 @@ void
 Fetch::IcachePort::recvReqRetry()
 {
     fetch->recvReqRetry();
+}
+
+template<typename IterType> void
+Fetch::cleanupFetchBuffer(IterType it, IterType end){
+    while( it != end){
+        delete *it;
+        it++;
+    }
 }
 
 } // namespace o3
