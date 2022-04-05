@@ -48,6 +48,7 @@
 #include <queue>
 
 #include "arch/generic/tlb.hh"
+#include "base/output.hh"
 #include "base/random.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
@@ -142,6 +143,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       numFetchingThreads(params.smtNumFetchingThreads),
       enablePerfectICache(params.enablePerfectICache),
       enableFDIP(params.enableFDIP),
+      dumpTms(params.dumpTms),
       icachePort(this, _cpu),
       // cms11 oracle
       REPL(params.cache_repl),
@@ -212,6 +214,12 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
     // Get the size of an instruction.
     instSize = decoder[0]->moreBytesSize();
     warn("ftqSize is %d\n",ftqSize);
+
+    // dump TMS stats at exit
+    // register with exit handler
+    if(dumpTms){
+        registerExitCallback([this]() { dumpTmsMap(); });
+    }
 }
 
 std::string Fetch::name() const { return cpu->name() + ".fetch"; }
@@ -626,20 +634,22 @@ Fetch::processCacheCompletion(PacketPtr pkt)
 
     decodeIdle[tid] = false;
 
-    auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
-    uint64_t &total = std::get<0>(tms);
-    uint64_t &miss = std::get<1>(tms);
-    uint64_t &starve = std::get<2>(tms);
-    ++total;
-    if (didWeStarve){
-        ++miss;
-        ++starve;
-        //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
-    } else{ 
-	if (pkt->req->getAccessDepth() > 0){
+    if(dumpTms){
+        auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
+        uint64_t &total = std::get<0>(tms);
+        uint64_t &miss = std::get<1>(tms);
+        uint64_t &starve = std::get<2>(tms);
+        ++total;
+        if (didWeStarve){
             ++miss;
-	}
-        //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
+            ++starve;
+            //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
+        } else{ 
+	        if (pkt->req->getAccessDepth() > 0){
+                    ++miss;
+	        }
+            //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
+        }
     }
 
     if (pureRandom && random < starveRandomness) {
@@ -3227,6 +3237,7 @@ Fetch::fetch(bool &status_change)
 
             // Do not clear these queues here or else
             //stale branches will not be squashed
+
             prefetchQueue[tid].clear();
             prefetchQueueBblSize[tid].clear();
             prefetchQueueSeqNum[tid].clear();
@@ -3710,6 +3721,23 @@ Fetch::cleanupFetchBuffer(IterType it, IterType end){
         delete *it;
         it++;
     }
+}
+
+void
+Fetch::dumpTmsMap(){
+
+    std::cout<<"TMS MAP dump\n";
+    ofstream tmsOut; 
+    tmsOut.open(simout.directory()+ "/starve_counts.txt");
+	for (auto const& tms : cpu->tmsMap){
+        tmsOut << "0x" << std::hex << tms.first
+               << std::dec << " "
+               << std::get<0>(tms.second) << " "
+               << std::get<0>(tms.second) << " "
+               << std::get<2>(tms.second) << "\n";
+	}
+
+    tmsOut.close();
 }
 
 } // namespace o3

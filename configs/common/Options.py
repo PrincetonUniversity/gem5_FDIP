@@ -160,6 +160,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--perfectICache", action="store_true", default=False)
     parser.add_argument("--fdip", action="store_true", default=False)
     parser.add_argument("--pureRandom", action="store_true", default=False)
+    parser.add_argument("--dump-tms", action="store_true", default=False)
     parser.add_argument("--histRandom", action="store_true", default=False)
     parser.add_argument("--emissary-enable-iq-empty", action="store_true", default=False)
     parser.add_argument("--fetchQSize", type=int, default=32)

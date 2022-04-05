@@ -362,6 +362,7 @@ class Fetch
     void preDecode();
     void addToFTQ();
     template<typename IterType> void cleanupFetchBuffer(IterType it, IterType end);
+    void dumpTmsMap();
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
      * @param status_change fetch() sets this variable if there was a status
@@ -562,6 +563,8 @@ class Fetch
     /** Enable FDIP **/
     bool enableFDIP;
 
+    /** Enable dumping of TMS Stats **/
+    bool dumpTms;
     /** Thread ID being fetched. */
     ThreadID threadFetched;
 

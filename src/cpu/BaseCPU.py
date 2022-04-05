@@ -175,6 +175,7 @@ class BaseCPU(ClockedObject):
     starveRandomness = Param.Float(50, "StarveRandomness")
     starveAtleast = Param.Unsigned(0, "StarveAtleast")
     randomStarve = Param.Bool(False, "RandomStarve")
+    dumpTms = Param.Bool(False, "Dump Total Miss and Starvation Counts per cache line")
     # oracle cms11
     cache_repl = Param.Unsigned(3, "Cache Replacement Policy")
     numSets = Param.Unsigned(64, "Num of Icacahe Sets")
