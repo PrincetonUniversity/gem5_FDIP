@@ -3238,10 +3238,10 @@ Fetch::fetch(bool &status_change)
             // Do not clear these queues here or else
             //stale branches will not be squashed
 
-            prefetchQueue[tid].clear();
-            prefetchQueueBblSize[tid].clear();
-            prefetchQueueSeqNum[tid].clear();
-            prefetchQueueBr[tid].clear();
+            //prefetchQueue[tid].clear();
+            //prefetchQueueBblSize[tid].clear();
+            //prefetchQueueSeqNum[tid].clear();
+            //prefetchQueueBr[tid].clear();
 
             prefetchBufferPC[tid].clear();
             cleanupFetchBuffer(fetchBuffer[tid].begin() ,fetchBuffer[tid].end());
