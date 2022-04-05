@@ -165,7 +165,13 @@ BPredUnit::getBblSize(Addr bbladdr, ThreadID tid)
 bool
 BPredUnit::getBblValid(Addr bbladdr, ThreadID tid)
 {
-    return BTB.valid(bbladdr, tid);
+    ++stats.BTBLookups;
+    if (BTB.valid(bbladdr, tid)){
+        ++stats.BTBHits;
+        return true;
+    }else{
+        return false;
+    }
 }
 
 TheISA::PCState
