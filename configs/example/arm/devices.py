@@ -40,6 +40,7 @@ from m5.objects import *
 m5.util.addToPath('../../')
 from common.Caches import *
 from common import ObjectList
+import math
 
 have_kvm = "ArmV8KvmCPU" in ObjectList.cpu_list.get_names()
 have_fastmodel = "FastModelCortexA76" in ObjectList.cpu_list.get_names()
@@ -67,10 +68,10 @@ class L1D(L1_DCache):
 
 
 class WalkCache(PageTableWalkerCache):
-    tag_latency = 4
-    data_latency = 4
-    response_latency = 4
-    mshrs = 6
+    tag_latency = 2
+    data_latency = 2
+    response_latency = 2
+    mshrs = 16
     tgts_per_mshr = 20
     size = '1kB'
     assoc = 8
@@ -156,6 +157,9 @@ class CpuCluster(SubSystem):
                 if args.pureRandom:
                     cpu.pureRandom = args.pureRandom
 
+                if args.dump_tms:
+                    cpu.dumpTms = args.dump_tms
+
                 if args.histRandom:
                     cpu.histRandom = args.histRandom
 
@@ -194,6 +198,8 @@ class CpuCluster(SubSystem):
                 cpu.branchPred = bpClass()
                 if args.btb_entries:
                     cpu.branchPred.BTBEntries = args.btb_entries
+                    #cpu.branchPred.BTBEntries = 64*1024*1024
+                    cpu.branchPred.BTBTagSize = 64 - (math.log(cpu.branchPred.BTBEntries,2) + 2)
                 indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
                 cpu.branchPred.indirectBranchPred = indirectBPClass()
 
