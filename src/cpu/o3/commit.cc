@@ -1455,10 +1455,10 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         //uint64_t &misPred = std::get<1>(brConf);
 
         //total++;
-        //if(head_inst->isControl() && head_inst->mispredicted()){
-        //    misPred++;
-        //    stats.commPathBranchMispredicts++;
-        //}
+        if(head_inst->isControl() && head_inst->mispredicted()){
+            //misPred++;
+            stats.commPathBranchMispredicts++;
+        }
     }
 
     //if(instCount == cpu->totalSimInsts){
