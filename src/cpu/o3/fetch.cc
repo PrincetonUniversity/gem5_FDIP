@@ -144,6 +144,10 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       enablePerfectICache(params.enablePerfectICache),
       enableFDIP(params.enableFDIP),
       dumpTms(params.dumpTms),
+      dumpBTBConf(params.dumpBTBConf),
+      btbConfMinInst(params.btbConfMinInst),
+      btbConfThreshold(params.btbConfThreshold),
+      enableStarvationEMISSARY(params.enableStarvationEMISSARY),
       icachePort(this, _cpu),
       // cms11 oracle
       REPL(params.cache_repl),
@@ -217,6 +221,9 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
 
     // dump TMS stats at exit
     // register with exit handler
+    if(dumpBTBConf){
+        registerExitCallback([this]() { dumpBTBConfMap(); });
+    }
     if(dumpTms){
         registerExitCallback([this]() { dumpTmsMap(); });
     }
@@ -576,94 +583,105 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     //    DPRINTFN("fetch head PC: %#x decodeStatus %d\n",*pc_it, fromDecode->decodeStatus[tid]); 
     //}
 
-    if(fromDecode->decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
-        DPRINTF(Fetch, "%#x %s %d ", (*memReq_it)->getVaddr(), level, resteer);
-        resteer = false;
-        RequestPtr mem_req2 = std::make_shared<Request>(
-            (*memReq_it)->getVaddr(), fetchBufferSize,
-            Request::INST_FETCH, cpu->instRequestorId(), (*memReq_it)->getPC(),
-            cpu->thread[tid]->contextId());
-        mem_req2->setPaddr((*memReq_it)->getPaddr());
-        mem_req2->taskId(cpu->taskId());
-        PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
+    if(enableStarvationEMISSARY){
+        if(fromDecode->decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
+            DPRINTF(Fetch, "%#x %s %d ", (*memReq_it)->getVaddr(), level, resteer);
+            resteer = false;
+            RequestPtr mem_req2 = std::make_shared<Request>(
+                (*memReq_it)->getVaddr(), fetchBufferSize,
+                Request::INST_FETCH, cpu->instRequestorId(), (*memReq_it)->getPC(),
+                cpu->thread[tid]->contextId());
+            mem_req2->setPaddr((*memReq_it)->getPaddr());
+            mem_req2->taskId(cpu->taskId());
+            PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
 
-        if (pkt->req->getAccessDepth()>0) {
-            //fetchL1MissStarve++;
-            //DPRINTFNR("T,%#x\n", (*memReq_it)->getVaddr());
-            missSt[tid][(pkt->req->getVaddr())>>6] ='S';
-            //fetchIcacheMissL1StDump++;
-            int numStarves = 0;
-            for(int i=0; i<8; i++) {
-                if ((pkt->starveHistory>>i) & 1) {
-                    numStarves++;
+            if (pkt->req->getAccessDepth()>0) {
+                //fetchL1MissStarve++;
+                //DPRINTFNR("T,%#x\n", (*memReq_it)->getVaddr());
+                missSt[tid][(pkt->req->getVaddr())>>6] ='S';
+                //fetchIcacheMissL1StDump++;
+                int numStarves = 0;
+                for(int i=0; i<8; i++) {
+                    if ((pkt->starveHistory>>i) & 1) {
+                        numStarves++;
+                    }
                 }
-            }
-            //numStarves = pkt->starveCount;
+                //numStarves = pkt->starveCount;
 
-            if (!pureRandom && pkt->req->getAccessDepth()==1) {
-                //fetchL2HitStarve++;
-                didWeStarve = true;
-                if(histRandom){
-                    if(random < starveRandomness)
+                if (!pureRandom && pkt->req->getAccessDepth()==1) {
+                    //fetchL2HitStarve++;
+                    didWeStarve = true;
+                    if(histRandom){
+                        if(random < starveRandomness)
+                            data_pkt2->setStarved(true);
+                    }else{
                         data_pkt2->setStarved(true);
-                }else{
-                    data_pkt2->setStarved(true);
-                }
-                // Random preserve insertion OR
-                // Insert always OR
-                // 50% or more of misses led to starvation OR
-                // Insert if starved atleast 1,2,4 etc number of times in last 8 accesses
-                if ((randomStarve && random < starveRandomness) || 
-                    (!randomStarve && starveAtleast==0) ||
-		    (!randomStarve && starveAtleast<=8 && numStarves >= starveAtleast)) {
-                    data_pkt2->setPreserve(true);
-                } else {
-                }
-                icachePort.sendTimingStarvationReq(data_pkt2);
+                    }
+                    // Random preserve insertion OR
+                    // Insert always OR
+                    // 50% or more of misses led to starvation OR
+                    // Insert if starved atleast 1,2,4 etc number of times in last 8 tccesses
+                    //auto& btbConf = cpu->btbConfMap[*pc_it];
+                    //uint64_t &btbTotal = std::get<0>(btbConf);
+                    //uint64_t &btbMisPred = std::get<1>(btbConf);
+                    
+                    //bool btbMissThreshold = false;
+                    //if (btbTotal > btbConfMinInst && ((float)btbMisPred)/(float)btbTotal > btbConfThreshold){
+                    //    DPRINTFN("BTB Miss Threshold met!\n");
+                    //    btbMissThreshold = true;
+                    //}
+                    if ((randomStarve && random < starveRandomness) || 
+                        (!randomStarve && starveAtleast==0) ||
+	    	            (!randomStarve && starveAtleast<=8 && numStarves >= starveAtleast)) {
+                        data_pkt2->setPreserve(true);
+                    } else {
+                    }
+                    icachePort.sendTimingStarvationReq(data_pkt2);
+                } 
             } 
-        } 
-    } else if(pkt->req->getAccessDepth()>0) {
-        //fetchL1MissNoStarve++;
-        //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
-        missSt[tid][(pkt->req->getVaddr())>>6] ='N';
-        //fetchIcacheMissL1NoStDump++;
-    } else {
-        //DPRINTFNR("H,%#x\n", (*memReq_it)->getVaddr());
-        missSt[tid][(pkt->req->getVaddr())>>6] ='H';
-    }
-
-    decodeIdle[tid] = false;
-
-    if(dumpTms){
-        auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
-        uint64_t &total = std::get<0>(tms);
-        uint64_t &miss = std::get<1>(tms);
-        uint64_t &starve = std::get<2>(tms);
-        ++total;
-        if (didWeStarve){
-            ++miss;
-            ++starve;
-            //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
-        } else{ 
-	        if (pkt->req->getAccessDepth() > 0){
-                    ++miss;
-	        }
+        } else if(pkt->req->getAccessDepth()>0) {
+            //fetchL1MissNoStarve++;
             //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
+            missSt[tid][(pkt->req->getVaddr())>>6] ='N';
+            //fetchIcacheMissL1NoStDump++;
+        } else {
+            //DPRINTFNR("H,%#x\n", (*memReq_it)->getVaddr());
+            missSt[tid][(pkt->req->getVaddr())>>6] ='H';
         }
-    }
 
-    if (pureRandom && random < starveRandomness) {
-        RequestPtr mem_req2 = std::make_shared<Request>(
-            (*memReq_it)->getVaddr(), fetchBufferSize,
-            Request::INST_FETCH, cpu->instRequestorId(), (*memReq_it)->getPC(),
-            cpu->thread[tid]->contextId());
-        mem_req2->setPaddr((*memReq_it)->getPaddr());
-        mem_req2->taskId(cpu->taskId());
-        PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
-        data_pkt2->setStarved(true);
-        data_pkt2->setPreserve(true);
-        DPRINTF(Fetch, "Fetch marking the bit as starved\n");
-        icachePort.sendTimingStarvationReq(data_pkt2);
+        decodeIdle[tid] = false;
+
+        if(dumpTms){
+            auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
+            uint64_t &total = std::get<0>(tms);
+            uint64_t &miss = std::get<1>(tms);
+            uint64_t &starve = std::get<2>(tms);
+            ++total;
+            if (didWeStarve){
+                ++miss;
+                ++starve;
+                //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
+            } else{ 
+	            if (pkt->req->getAccessDepth() > 0){
+                        ++miss;
+	            }
+                //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
+            }
+        }
+
+        if (pureRandom && random < starveRandomness) {
+            RequestPtr mem_req2 = std::make_shared<Request>(
+                (*memReq_it)->getVaddr(), fetchBufferSize,
+                Request::INST_FETCH, cpu->instRequestorId(), (*memReq_it)->getPC(),
+                cpu->thread[tid]->contextId());
+            mem_req2->setPaddr((*memReq_it)->getPaddr());
+            mem_req2->taskId(cpu->taskId());
+            PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
+            data_pkt2->setStarved(true);
+            data_pkt2->setPreserve(true);
+            DPRINTF(Fetch, "Fetch marking the bit as starved\n");
+            icachePort.sendTimingStarvationReq(data_pkt2);
+        }
     }
  
     DPRINTF(Fetch, "fetchBufferBlockPC: %#x and pc_it: %#x fetchAddr: %#x\n",
@@ -2102,8 +2120,14 @@ TheISA::PCState
 Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch, bool &instLimitReached)
 {
     TheISA::PCState predictPC = prefetchPc;
-    if (!branchPred->getBblValid(prefetchPc.instAddr(), tid))
+    auto& btbConf = cpu->btbConfMap[prefetchPc.instAddr()];
+    uint64_t &btbTotal = std::get<0>(btbConf);
+    uint64_t &btbMisPred = std::get<1>(btbConf);
+    btbTotal++;
+    if (!branchPred->getBblValid(prefetchPc.instAddr(), tid)){
+        btbMisPred++;
         return 0;
+    }
     //if((prefetchPc.instAddr() & 0xff000000) != 0){
     //    return 0;
     //}
@@ -2207,7 +2231,7 @@ Fetch::predictNextBasicBlock(TheISA::PCState prefetchPc, TheISA::PCState &branch
        //uint64_t &total = std::get<0>(brConf);
        //uint64_t &misPred = std::get<1>(brConf);
 
-       //if(total > 100 && misPred/total > 0.1){
+       //if(total > 100 && (float)misPred/total > 0.1){
        //    stopPrefetch = true;
        //}
 
@@ -3723,6 +3747,21 @@ Fetch::cleanupFetchBuffer(IterType it, IterType end){
     }
 }
 
+void
+Fetch::dumpBTBConfMap(){
+
+    std::cout<<"BTB Conf MAP dump\n";
+    ofstream btbConfOut; 
+    btbConfOut.open(simout.directory()+ "/btbConf.txt");
+	for (auto const& btbStat : cpu->btbConfMap){
+        btbConfOut << "0x" << std::hex << btbStat.first
+               << std::dec << " "
+               << std::get<0>(btbStat.second) << " "
+               << std::get<1>(btbStat.second) << "\n";
+	}
+
+    btbConfOut.close();
+}
 void
 Fetch::dumpTmsMap(){
 

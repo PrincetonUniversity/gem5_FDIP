@@ -362,6 +362,7 @@ class Fetch
     void preDecode();
     void addToFTQ();
     template<typename IterType> void cleanupFetchBuffer(IterType it, IterType end);
+    void dumpBTBConfMap();
     void dumpTmsMap();
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
@@ -565,6 +566,10 @@ class Fetch
 
     /** Enable dumping of TMS Stats **/
     bool dumpTms;
+    bool dumpBTBConf;
+    uint32_t btbConfMinInst;
+    float btbConfThreshold;
+    bool enableStarvationEMISSARY;
     /** Thread ID being fetched. */
     ThreadID threadFetched;
 

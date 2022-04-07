@@ -627,7 +627,9 @@ class CPU : public BaseCPU
     std::map<Addr, tms> tmsMap; // total, miss, starve, starve_rate
 
     typedef std::tuple<uint64_t, uint64_t> brConf; // total, miss, starve, starve_rate
+    typedef std::tuple<uint64_t, uint64_t> btbConf; // total, miss, starve, starve_rate
     std::map<Addr, brConf> brConfMap; // total, miss, starve, starve_rate
+    std::map<Addr, btbConf> btbConfMap; // total, miss, starve, starve_rate
     //EMISSARY: END
 
     /** CPU pushRequest function, forwards request to LSQ. */

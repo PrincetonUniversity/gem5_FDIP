@@ -160,6 +160,15 @@ class CpuCluster(SubSystem):
                 if args.dump_tms:
                     cpu.dumpTms = args.dump_tms
 
+                if args.dump_btbconf:
+                    cpu.dumpBTBConf = args.dump_btbconf
+
+                if args.btbConfThreshold:
+                    cpu.btbConfThreshold = args.btbConfThreshold
+
+                if args.btbConfMinInst:
+                    cpu.btbConfMinInst = args.btbConfMinInst
+
                 if args.histRandom:
                     cpu.histRandom = args.histRandom
 
@@ -171,6 +180,9 @@ class CpuCluster(SubSystem):
 
                 if args.ftqInst >0:
                     cpu.ftqInst = args.ftqInst
+
+                if self._l1i_rp == "LRUEmissary" or self._l2_rp =="LRUEmissary":
+                    cpu.enableStarvationEMISSARY = True
 
                 if args.totalSimInsts:
                     cpu.totalSimInsts = args.totalSimInsts

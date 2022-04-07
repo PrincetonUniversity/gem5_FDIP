@@ -176,6 +176,10 @@ class BaseCPU(ClockedObject):
     starveAtleast = Param.Unsigned(0, "StarveAtleast")
     randomStarve = Param.Bool(False, "RandomStarve")
     dumpTms = Param.Bool(False, "Dump Total Miss and Starvation Counts per cache line")
+    dumpBTBConf = Param.Bool(False, "Dump Total Miss and Starvation Counts per cache line")
+    btbConfMinInst = Param.Unsigned(100, "Minim number of times before checking for conf threshold")
+    btbConfThreshold = Param.Float(0.8, "BTB Miss rate threshold to preserve a line")
+    enableStarvationEMISSARY = Param.Bool(False, "Flag to enable starvation based EMISSARY")
     # oracle cms11
     cache_repl = Param.Unsigned(3, "Cache Replacement Policy")
     numSets = Param.Unsigned(64, "Num of Icacahe Sets")
