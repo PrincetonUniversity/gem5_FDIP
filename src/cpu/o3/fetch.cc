@@ -3733,7 +3733,7 @@ Fetch::dumpTmsMap(){
         tmsOut << "0x" << std::hex << tms.first
                << std::dec << " "
                << std::get<0>(tms.second) << " "
-               << std::get<0>(tms.second) << " "
+               << std::get<1>(tms.second) << " "
                << std::get<2>(tms.second) << "\n";
 	}
 
