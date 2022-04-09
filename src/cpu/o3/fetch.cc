@@ -608,7 +608,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
                 }
                 //numStarves = pkt->starveCount;
 
-                if (!pureRandom && pkt->req->getAccessDepth()==1) {
+                if (!pureRandom && pkt->req->getAccessDepth()>=1) {
                     //fetchL2HitStarve++;
                     didWeStarve = true;
                     if(histRandom){
@@ -651,20 +651,25 @@ Fetch::processCacheCompletion(PacketPtr pkt)
 
         decodeIdle[tid] = false;
 
+        //if(didWeStarve){
+        //    DPRINTFN("Prefetch Queue size %d\n",prefetchQueue[tid].size());
+        //}
+
         if(dumpTms){
             auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
             uint64_t &total = std::get<0>(tms);
-            uint64_t &miss = std::get<1>(tms);
-            uint64_t &starve = std::get<2>(tms);
+            uint64_t &l1_miss = std::get<1>(tms);
+            uint64_t &l2_miss = std::get<2>(tms);
+            uint64_t &starve = std::get<3>(tms);
             ++total;
             if (didWeStarve){
-                ++miss;
                 ++starve;
                 //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
-            } else{ 
-	            if (pkt->req->getAccessDepth() > 0){
-                        ++miss;
-	            }
+            }
+            if(pkt->req->getAccessDepth()==1){
+                ++l1_miss;
+            }else if (pkt->req->getAccessDepth() > 1){
+                ++l2_miss;
                 //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
             }
         }
@@ -3773,7 +3778,8 @@ Fetch::dumpTmsMap(){
                << std::dec << " "
                << std::get<0>(tms.second) << " "
                << std::get<1>(tms.second) << " "
-               << std::get<2>(tms.second) << "\n";
+               << std::get<2>(tms.second) << " "
+               << std::get<3>(tms.second) << "\n";
 	}
 
     tmsOut.close();

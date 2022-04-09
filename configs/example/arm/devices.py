@@ -183,6 +183,8 @@ class CpuCluster(SubSystem):
 
                 if self._l1i_rp == "LRUEmissary" or self._l2_rp =="LRUEmissary":
                     cpu.enableStarvationEMISSARY = True
+                cpu.enableStarvationEMISSARY = True
+
 
                 if args.totalSimInsts:
                     cpu.totalSimInsts = args.totalSimInsts

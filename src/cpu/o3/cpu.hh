@@ -623,7 +623,7 @@ class CPU : public BaseCPU
     std::vector<ThreadID> tids;
 
     //EMISSARY: BEGIN
-    typedef std::tuple<uint64_t, uint64_t, uint64_t> tms; // total, miss, starve, starve_rate
+    typedef std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> tms; // total, miss, starve, starve_rate
     std::map<Addr, tms> tmsMap; // total, miss, starve, starve_rate
 
     typedef std::tuple<uint64_t, uint64_t> brConf; // total, miss, starve, starve_rate
