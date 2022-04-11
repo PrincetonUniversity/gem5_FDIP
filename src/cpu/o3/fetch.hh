@@ -570,6 +570,7 @@ class Fetch
     uint32_t btbConfMinInst;
     float btbConfThreshold;
     bool enableStarvationEMISSARY;
+    Addr resteerTarget;
     /** Thread ID being fetched. */
     ThreadID threadFetched;
 
@@ -663,6 +664,8 @@ class Fetch
         statistics::Formula branchRate;
         /** Number of instruction fetched per cycle. */
         statistics::Formula rate;
+        statistics::Scalar fetchTotalStarvations;
+        statistics::Scalar fetchNonResteerStarvations;
     } fetchStats;
 };
 

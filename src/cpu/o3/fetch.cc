@@ -148,6 +148,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       btbConfMinInst(params.btbConfMinInst),
       btbConfThreshold(params.btbConfThreshold),
       enableStarvationEMISSARY(params.enableStarvationEMISSARY),
+      resteerTarget(0),
       icachePort(this, _cpu),
       // cms11 oracle
       REPL(params.cache_repl),
@@ -291,7 +292,11 @@ Fetch::FetchStatGroup::FetchStatGroup(CPU *cpu, Fetch *fetch)
     ADD_STAT(rate, statistics::units::Rate<
                     statistics::units::Count, statistics::units::Cycle>::get(),
              "Number of inst fetches per cycle",
-             insts / cpu->baseStats.numCycles)
+             insts / cpu->baseStats.numCycles),
+    ADD_STAT(fetchTotalStarvations, statistics::units::Count::get(),
+             "Number of times fetch starved on a line"),
+    ADD_STAT(fetchNonResteerStarvations, statistics::units::Count::get(),
+             "Number of times fetch starved on a line when not resteering")
 {
         icacheStallCycles
             .prereq(icacheStallCycles);
@@ -340,6 +345,10 @@ Fetch::FetchStatGroup::FetchStatGroup(CPU *cpu, Fetch *fetch)
             .flags(statistics::total);
         rate
             .flags(statistics::total);
+       fetchTotalStarvations 
+            .prereq(fetchTotalStarvations);
+       fetchNonResteerStarvations 
+            .prereq(fetchNonResteerStarvations);
 }
 void
 Fetch::setTimeBuffer(TimeBuffer<TimeStruct> *time_buffer)
@@ -651,9 +660,19 @@ Fetch::processCacheCompletion(PacketPtr pkt)
 
         decodeIdle[tid] = false;
 
-        //if(didWeStarve){
-        //    DPRINTFN("Prefetch Queue size %d\n",prefetchQueue[tid].size());
-        //}
+        if(didWeStarve){
+            fetchStats.fetchTotalStarvations++;
+            if ((resteerTarget >> 6) != ((*memReq_it)->getVaddr() >> 6)){
+                fetchStats.fetchNonResteerStarvations++;
+            }
+            //DPRINTF(Fetch,"Prefetch Queue size %d\n",prefetchQueue[tid].size());
+        }
+        
+        //Reset the resteerTarget
+        if ((resteerTarget >> 6) == ((*memReq_it)->getVaddr() >> 6) &&
+                memReq_it == memReq[tid].begin()){
+            resteerTarget = 0;
+        }
 
         if(dumpTms){
             auto& tms = cpu->tmsMap[(*memReq_it)->getVaddr()];
@@ -1541,6 +1560,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
     //if (lastinst[tid]) {
         prefPC[tid] = newPC;
         lastPrefPC = newPC;
+        resteerTarget = newPC.instAddr();
         //bblAddr[tid] = prefPC[tid].instAddr();
         prefetchQueue[tid].clear();
         prefetchQueueBblSize[tid].clear();
@@ -3157,6 +3177,14 @@ Fetch::fetch(bool &status_change)
                 instruction->buf = buffer_cache[tid][(thisPC.instAddr())>>6];
                 instruction->starve = starve[tid][(thisPC.instAddr())>>6];
                 instruction->missSt = missSt[tid][(thisPC.instAddr())>>6];
+                
+                //erase from map after assigning
+                memsent_ticks[tid].erase((thisPC.instAddr())>>6);
+                memrecv_ticks[tid].erase((thisPC.instAddr())>>6);
+                memlevels[tid].erase((thisPC.instAddr())>>6);
+                buffer_cache[tid].erase((thisPC.instAddr())>>6);
+                starve[tid].erase((thisPC.instAddr())>>6);
+                missSt[tid].erase((thisPC.instAddr())>>6);
                 //instruction->fetchIcacheMissL1Dump = fetchIcacheMissL1Dump;
                 //instruction->fetchIcacheMissL1StDump = fetchIcacheMissL1StDump;
                 //instruction->fetchIcacheMissL1NoStDump = fetchIcacheMissL1NoStDump;
