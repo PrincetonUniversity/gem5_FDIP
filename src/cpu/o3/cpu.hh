@@ -625,6 +625,7 @@ class CPU : public BaseCPU
     //EMISSARY: BEGIN
     typedef std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> tms; // total, miss, starve, starve_rate
     std::map<Addr, tms> tmsMap; // total, miss, starve, starve_rate
+    std::map<Addr, tms> physTmsMap; // total, miss, starve, starve_rate to physical address
 
     typedef std::tuple<uint64_t, uint64_t> brConf; // total, miss, starve, starve_rate
     typedef std::tuple<uint64_t, uint64_t> btbConf; // total, miss, starve, starve_rate

@@ -95,7 +95,7 @@ class L3(Cache):
     assoc = 16
     tag_latency = 15
     data_latency = 15
-    response_latency = 20
+    response_latency = 30
     mshrs = 64
     tgts_per_mshr = 20
     write_buffers = 64
@@ -214,7 +214,8 @@ class CpuCluster(SubSystem):
                     cpu.branchPred.BTBEntries = args.btb_entries
                     #cpu.branchPred.BTBEntries = 64*1024*1024
                     cpu.branchPred.BTBTagSize = 64 - (math.log(cpu.branchPred.BTBEntries,2) + 2)
-                indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
+                #indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
+                indirectBPClass = ObjectList.indirect_bp_list.get('ITTAGE')
                 cpu.branchPred.indirectBranchPred = indirectBPClass()
 
             #if args.indirect_bp_type:
@@ -291,6 +292,15 @@ class CpuCluster(SubSystem):
             else:
                 self.l2.preserve_ways = 6
                 self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+        elif self._l2_rp == "LIP":
+            self.l2.replacement_policy = LIPRP()
+        elif self._l2_rp == "MLP":
+            self.l2.replacement_policy = MLPLINRP()
+        elif self._l2_rp == "SBIP":
+            self.l2.replacement_policy = SBIPRP()
+        elif self._l2_rp == "BIP":
+            self.l2.replacement_policy = BIPRP()
+            self.l2.replacement_policy.btp = 3 # self.btp
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size

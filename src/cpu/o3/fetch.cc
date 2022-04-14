@@ -680,15 +680,27 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             uint64_t &l1_miss = std::get<1>(tms);
             uint64_t &l2_miss = std::get<2>(tms);
             uint64_t &starve = std::get<3>(tms);
+
+            //physTmsMap: physcial address to TMS stats
+            auto& phys_tms = cpu->physTmsMap[(*memReq_it)->getPaddr()];
+            uint64_t &phys_total =   std::get<0>(phys_tms);
+            uint64_t &phys_l1_miss = std::get<1>(phys_tms);
+            uint64_t &phys_l2_miss = std::get<2>(phys_tms);
+            uint64_t &phys_starve =  std::get<3>(phys_tms);
+
             ++total;
+            ++phys_total;
             if (didWeStarve){
                 ++starve;
+                ++phys_starve;
                 //DPRINTFNR("T, %#x\n", (*memReq_it)->getVaddr());
             }
             if(pkt->req->getAccessDepth()==1){
                 ++l1_miss;
+                ++phys_l1_miss;
             }else if (pkt->req->getAccessDepth() > 1){
                 ++l2_miss;
+                ++phys_l2_miss;
                 //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
             }
         }
@@ -3811,6 +3823,20 @@ Fetch::dumpTmsMap(){
 	}
 
     tmsOut.close();
+
+    std::cout<<"Phys TMS MAP dump\n";
+    ofstream physTmsOut; 
+    physTmsOut.open(simout.directory()+ "/phys_starve_counts.txt");
+	for (auto const& phys_tms : cpu->physTmsMap){
+        physTmsOut << "0x" << std::hex << phys_tms.first
+               << std::dec << " "
+               << std::get<0>(phys_tms.second) << " "
+               << std::get<1>(phys_tms.second) << " "
+               << std::get<2>(phys_tms.second) << " "
+               << std::get<3>(phys_tms.second) << "\n";
+	}
+
+    physTmsOut.close();
 }
 
 } // namespace o3
