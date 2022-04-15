@@ -47,6 +47,7 @@
 #include "base/statistics.hh"
 #include "base/types.hh"
 #include "cpu/pred/btb.hh"
+#include "cpu/pred/ideal_btb.hh"
 #include "cpu/pred/indirect.hh"
 #include "cpu/pred/ras.hh"
 #include "cpu/inst_seq.hh"
@@ -323,7 +324,8 @@ class BPredUnit : public SimObject
     std::vector<History> predHist;
 
     /** The BTB. */
-    DefaultBTB BTB;
+    //DefaultBTB BTB;
+    IdealBTB BTB;
 
     /** The per-thread return address stack. */
     std::vector<ReturnAddrStack> RAS;
