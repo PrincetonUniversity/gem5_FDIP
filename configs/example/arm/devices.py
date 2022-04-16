@@ -48,7 +48,7 @@ have_fastmodel = "FastModelCortexA76" in ObjectList.cpu_list.get_names()
 class L1I(L1_ICache):
     tag_latency = 2
     data_latency = 2
-    response_latency = 2
+    response_latency = 0
     mshrs = 16
     tgts_per_mshr = 20
     size = '32kB'
@@ -59,7 +59,7 @@ class L1I(L1_ICache):
 class L1D(L1_DCache):
     tag_latency = 2
     data_latency = 2
-    response_latency = 2
+    response_latency = 0
     mshrs = 16
     tgts_per_mshr = 20
     size = '64kB'
@@ -70,7 +70,7 @@ class L1D(L1_DCache):
 class WalkCache(PageTableWalkerCache):
     tag_latency = 2
     data_latency = 2
-    response_latency = 2
+    response_latency = 0
     mshrs = 16
     tgts_per_mshr = 20
     size = '1kB'
@@ -79,9 +79,9 @@ class WalkCache(PageTableWalkerCache):
 
 
 class L2(L2Cache):
-    tag_latency = 5
-    data_latency = 5
-    response_latency = 10
+    tag_latency = 10
+    data_latency = 10
+    response_latency = 0
     mshrs = 32
     tgts_per_mshr = 20
     size = '1MB'
@@ -93,9 +93,9 @@ class L2(L2Cache):
 class L3(Cache):
     size = '2MB'
     assoc = 16
-    tag_latency = 15
-    data_latency = 15
-    response_latency = 30
+    tag_latency = 20
+    data_latency = 20
+    response_latency = 0
     mshrs = 64
     tgts_per_mshr = 20
     write_buffers = 64
