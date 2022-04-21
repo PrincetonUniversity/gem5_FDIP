@@ -486,6 +486,7 @@ class Commit
     uint64_t prevFetchTick;
     bool isPrevBranch;
     uint64_t instCount;
+    Addr prevLine;
 
     struct CommitStats : public statistics::Group
     {

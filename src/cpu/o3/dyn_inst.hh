@@ -1134,6 +1134,7 @@ class DynInst : public ExecContext, public RefCounted
     bool isStalled = false;
     char mispred = 0;
     bool isBTBMiss = false;
+    bool isPredictable = false;
 
     Tick fetchTick = -1;      // instruction fetch is completed.
     int32_t decodeTick = -1;  // instruction enters decode phase

@@ -105,6 +105,7 @@ std::map<Addr,int> memlevels[10];
 std::map<Addr,bool> buffer_cache[10];
 std::map<Addr,bool> starve[10];
 std::map<Addr,char> missSt[10];
+std::map<Addr,bool> isPredictable[10];
 
 /** Nayana: FDIP based Fetch Target Queue. */
 std::deque<TheISA::PCState> prefetchQueue[FTQ_MAX_SIZE];
@@ -565,10 +566,10 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     assert(req_it != fetchBufferReqPtr[tid].end() && "req_it cannot be end\n");
     DPRINTF(Fetch, "fetchBufferPC: %#x fetchBufferReqPtr: %#x memReq_it: %#x pkt->req: %#x\n",*pc_it, *req_it, *memReq_it, pkt->req);
     // cms11 edit
-    memrecv_ticks[tid][(pkt->req->getVaddr())>>6] = curTick();
-    memlevels[tid][(pkt->req->getVaddr())>>6] = memHierarchLevel;
-    buffer_cache[tid][(pkt->req->getVaddr())>>6] = true;
-    starve[tid][(pkt->req->getVaddr())>>6] = decodeIdle[tid];
+    memrecv_ticks[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
+    memlevels[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = memHierarchLevel;
+    buffer_cache[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = true;
+    starve[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = fromDecode->decodeIdle[tid];
 
     //Commenting this code since pc_it , buf_it and valid_it iterator is pointing
     //to the proper entry
@@ -607,7 +608,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             if (pkt->req->getAccessDepth()>0) {
                 //fetchL1MissStarve++;
                 //DPRINTFNR("T,%#x\n", (*memReq_it)->getVaddr());
-                missSt[tid][(pkt->req->getVaddr())>>6] ='S';
+                missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='S';
                 //fetchIcacheMissL1StDump++;
                 int numStarves = 0;
                 for(int i=0; i<8; i++) {
@@ -617,7 +618,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
                 }
                 //numStarves = pkt->starveCount;
 
-                if (!pureRandom && pkt->req->getAccessDepth()>=1) {
+                if (!pureRandom && pkt->req->getAccessDepth()==1) {
                     //fetchL2HitStarve++;
                     didWeStarve = true;
                     if(histRandom){
@@ -651,11 +652,11 @@ Fetch::processCacheCompletion(PacketPtr pkt)
         } else if(pkt->req->getAccessDepth()>0) {
             //fetchL1MissNoStarve++;
             //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
-            missSt[tid][(pkt->req->getVaddr())>>6] ='N';
+            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='N';
             //fetchIcacheMissL1NoStDump++;
         } else {
             //DPRINTFNR("H,%#x\n", (*memReq_it)->getVaddr());
-            missSt[tid][(pkt->req->getVaddr())>>6] ='H';
+            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='H';
         }
 
         decodeIdle[tid] = false;
@@ -668,9 +669,11 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             //DPRINTF(Fetch,"Prefetch Queue size %d\n",prefetchQueue[tid].size());
         }
         
+        isPredictable[tid][(*memReq_it)->getVaddr() >> CACHE_LISZE_SIZE_WIDTH] = true;
         //Reset the resteerTarget
         if ((resteerTarget >> 6) == ((*memReq_it)->getVaddr() >> 6) &&
                 memReq_it == memReq[tid].begin()){
+            isPredictable[tid][resteerTarget >> CACHE_LISZE_SIZE_WIDTH] = false;
             resteerTarget = 0;
         }
 
@@ -1331,7 +1334,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                     "response.\n", tid);
             lastIcacheStall[tid] = curTick();
             // cms11
-            memsent_ticks[tid][(mem_req->getVaddr())>>6] = curTick();
+            memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
             if(add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1))
                 fetchStatus[tid] = IcacheWaitResponse;
             // Notify Fetch Request probe when a packet containing a fetch
@@ -1398,7 +1401,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                         "response.\n", tid);
                 lastIcacheStall[tid] = curTick();
                 // cms11
-                memsent_ticks[tid][(mem_req->getVaddr())>>6] = curTick();
+                memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
                 if(add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1))
                     fetchStatus[tid] = IcacheWaitResponse;
                 // Notify Fetch Request probe when a packet containing a fetch
@@ -1657,6 +1660,15 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
     delayedCommit[tid] = true;
 
     ++fetchStats.squashCycles;
+    
+    //erase from map after assigning
+    memsent_ticks[tid].clear();
+    memrecv_ticks[tid].clear();
+    memlevels[tid].clear();
+    buffer_cache[tid].clear();
+    starve[tid].clear();
+    missSt[tid].clear();
+    isPredictable[tid].clear();
 }
 
 void
@@ -3183,20 +3195,22 @@ Fetch::fetch(bool &status_change)
                 instruction->mispred = 'F';
                 instruction->squashedFromThisInst = false;
                 // cms11 edit
-                instruction->memsentTick = memsent_ticks[tid][(thisPC.instAddr())>>6];
-                instruction->memrecvTick = memrecv_ticks[tid][(thisPC.instAddr())>>6];
-                instruction->memlevel = memlevels[tid][(thisPC.instAddr())>>6];
-                instruction->buf = buffer_cache[tid][(thisPC.instAddr())>>6];
-                instruction->starve = starve[tid][(thisPC.instAddr())>>6];
-                instruction->missSt = missSt[tid][(thisPC.instAddr())>>6];
+                instruction->memsentTick = memsent_ticks[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->memrecvTick = memrecv_ticks[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->memlevel = memlevels[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->buf = buffer_cache[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->starve = starve[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->missSt = missSt[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->isPredictable = isPredictable[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
                 
                 //erase from map after assigning
-                memsent_ticks[tid].erase((thisPC.instAddr())>>6);
-                memrecv_ticks[tid].erase((thisPC.instAddr())>>6);
-                memlevels[tid].erase((thisPC.instAddr())>>6);
-                buffer_cache[tid].erase((thisPC.instAddr())>>6);
-                starve[tid].erase((thisPC.instAddr())>>6);
-                missSt[tid].erase((thisPC.instAddr())>>6);
+                //memsent_ticks[tid].erase((thisPC.instAddr()));
+                //memrecv_ticks[tid].erase((thisPC.instAddr()));
+                //memlevels[tid].erase((thisPC.instAddr()));
+                //buffer_cache[tid].erase((thisPC.instAddr()));
+                //starve[tid].erase((thisPC.instAddr()));
+                //missSt[tid].erase((thisPC.instAddr()));
+                //isPredictable[tid].erase((thisPC.instAddr()));
                 //instruction->fetchIcacheMissL1Dump = fetchIcacheMissL1Dump;
                 //instruction->fetchIcacheMissL1StDump = fetchIcacheMissL1StDump;
                 //instruction->fetchIcacheMissL1NoStDump = fetchIcacheMissL1NoStDump;
