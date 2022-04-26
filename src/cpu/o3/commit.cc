@@ -1453,7 +1453,11 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
                  head_inst->idleCycles, head_inst->instAddr(), 
                  head_inst->instQOccDecode, head_inst->mispredicted() ? 'T':'F', 
                  curTick() , head_inst->isControl() ? 'T' : 'F',
+#if THE_ISA == ARM_ISA
                  thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0),
+#else
+                 0,
+#endif
                  head_inst->isPredictable ? 'T' : 'F',
                  head_inst->starve ? 'T' : 'F',
                  head_inst->memlevel);
@@ -1467,7 +1471,13 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
                 head_inst->mispredicted() ? 'T': 'F',
                 head_inst->isBTBMiss ? 'M' : 'H',
                 head_inst->isIndirectCtrl()? 'I' : 'D',
-                thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0));
+#if THE_ISA == ARM_ISA
+                thread[tid]->getTC()->readMiscReg(ArmISA::MISCREG_TPIDR_EL0)
+#else
+                0
+#endif
+
+        );
     }
 
     if( !head_inst->isMicroop() || head_inst->isLastMicroop()){
