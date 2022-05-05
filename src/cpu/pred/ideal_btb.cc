@@ -77,7 +77,7 @@ IdealBTB::reset()
 }
 
 inline
-unsigned
+uint64_t
 IdealBTB::getIndex(Addr instPC, ThreadID tid)
 {
     // Need to shift PC over by the word offset.
@@ -99,7 +99,7 @@ IdealBTB::getTag(Addr instPC)
 bool
 IdealBTB::type(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -118,7 +118,7 @@ IdealBTB::type(Addr instPC, ThreadID tid)
 bool
 IdealBTB::valid(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -135,7 +135,7 @@ IdealBTB::valid(Addr instPC, ThreadID tid)
 
 int
 IdealBTB::getBblIndex(Addr instPC, ThreadID tid){
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
 
     Addr inst_tag = getTag(instPC);
@@ -190,7 +190,7 @@ IdealBTB::lookupBranchPCFromIndex(unsigned idx, ThreadID tid)
 StaticInstPtr
 IdealBTB::lookupBranch(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -208,7 +208,7 @@ IdealBTB::lookupBranch(Addr instPC, ThreadID tid)
 TheISA::PCState
 IdealBTB::lookupBranchPC(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -226,7 +226,7 @@ IdealBTB::lookupBranchPC(Addr instPC, ThreadID tid)
 uint64_t
 IdealBTB::lookupBblSize(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -244,7 +244,7 @@ IdealBTB::lookupBblSize(Addr instPC, ThreadID tid)
 TheISA::PCState
 IdealBTB::lookup(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -262,7 +262,7 @@ IdealBTB::lookup(Addr instPC, ThreadID tid)
 TheISA::PCState
 IdealBTB::lookupFT(Addr instPC, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     Addr inst_tag = getTag(instPC);
 
@@ -280,7 +280,7 @@ IdealBTB::lookupFT(Addr instPC, ThreadID tid)
 void
 IdealBTB::update(Addr instPC, const TheISA::PCState &target, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
 
     //assert(btb_idx < numEntries);
 
@@ -296,9 +296,9 @@ IdealBTB::update(Addr instPC, const StaticInstPtr &staticBranchInst,
                    const uint64_t bblSize, const TheISA::PCState &target, 
                    const TheISA::PCState &ft, bool uncond, ThreadID tid)
 {
-    unsigned btb_idx = getIndex(instPC, tid);
+    uint64_t btb_idx = getIndex(instPC, tid);
     
-        DPRINTF(Fetch, "BTB update btb_index: %d staticBrancInst 0x%lx target %s branchPC: %s\n", 
+        DPRINTF(Fetch, "BTB update btb_index: %llu staticBrancInst 0x%lx target %s branchPC: %s\n", 
 		    btb_idx, &*staticBranchInst, target, branch);
 
     //assert(btb_idx < numEntries);
@@ -322,7 +322,7 @@ IdealBTB::update(Addr instPC, const StaticInstPtr &staticBranchInst,
     //  return;
     //}
 
-    //unsigned leader_btb_idx = getIndex(block, tid);
+    //uint64_t leader_btb_idx = getIndex(block, tid);
 
     ////If the leader entry is a valid entry then check if the branch PC it is pointing to
     ////is the closest one in the block

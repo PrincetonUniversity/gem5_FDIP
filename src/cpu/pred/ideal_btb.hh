@@ -142,7 +142,7 @@ class IdealBTB
      *  @param inst_PC The branch to look up.
      *  @return Returns the index into the BTB.
      */
-    inline unsigned getIndex(Addr instPC, ThreadID tid);
+    inline uint64_t getIndex(Addr instPC, ThreadID tid);
 
     /** Returns the tag bits of a given address.
      *  @param inst_PC The branch's address.
