@@ -449,7 +449,7 @@ BaseCache::recvTimingReq(PacketPtr pkt)
 
         //DPRINTFN("REQ: %s starveHistory for addr %#x is %#x\n", name(), pkt->getAddr(), blk->starveHistory);
         //EMISSARY: BEGIN
-        if (pkt->isWriteback() && pkt->evictFromL1) {
+        if (blk && pkt->isWriteback() && pkt->evictFromL1) {
             blk->l1AccessCount = pkt->accessCount;
             blk->starveHistory = (pkt->starveHistory << 1) | (pkt->isStarved() ? 1 : 0);
             blk->starveCount = pkt->starveCount + (pkt->isStarved() ? 1 : 0);
