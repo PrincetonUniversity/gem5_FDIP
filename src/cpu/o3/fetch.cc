@@ -510,6 +510,11 @@ Fetch::processCacheCompletion(PacketPtr pkt)
         DPRINTF(Fetch, "MemReqIter memReq : %#x\n",(*memReq_it)->getVaddr());
         ++memReq_it;
     }
+
+    DPRINTF(Fetch, "AccessDepth :%d memReq : %#x physAddr: %#x\n",
+            pkt->req->getAccessDepth(),
+            pkt->req->getVaddr(),
+            pkt->req->getPaddr());
     
     TheISA::PCState thisPC = pc[tid];
     Addr pcOffset = fetchOffset[tid];
@@ -618,7 +623,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
                 }
                 //numStarves = pkt->starveCount;
 
-                if (!pureRandom && pkt->req->getAccessDepth()==1) {
+                if (!pureRandom && pkt->req->getAccessDepth()>=1) {
                     //fetchL2HitStarve++;
                     didWeStarve = true;
                     if(histRandom){
@@ -1228,12 +1233,6 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     FetchTranslation *trans = new FetchTranslation(this);
     cpu->mmu->translateTiming(mem_req, cpu->thread[tid]->getTC(),
                               trans, BaseMMU::Execute);
-    //Fault e_fault = cpu->mmu->translateFunctional(mem_req, cpu->thread[tid]->getTC(),
-    //                           BaseMMU::Execute);
-    //if(e_fault == NoFault){
-    //    finishTranslation(e_fault, mem_req);
-    //}
-
    return true;
 }
 
