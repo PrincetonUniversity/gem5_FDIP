@@ -162,6 +162,9 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       ftqInst(params.ftqInst),
       trackLastBlock(false),
       numSets(params.numSets),
+      oracleEMISSARY(params.oracleEMISSARY),
+      oracleStarvationsFileName(params.oracleStarvationsFileName),
+      oracleStarvationCountThreshold(params.oracleStarvationCountThreshold),
       finishTranslationEvent(this), fetchStats(_cpu, this)
 {
     if (numThreads > MaxThreads)
@@ -228,6 +231,10 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
     }
     if(dumpTms){
         registerExitCallback([this]() { dumpTmsMap(); });
+    }
+
+    if(oracleEMISSARY){
+       createOracleStarvationMap(); 
     }
 }
 
@@ -598,9 +605,12 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     //    DPRINTFN("fetch head PC: %#x decodeStatus %d\n",*pc_it, fromDecode->decodeStatus[tid]); 
     //}
 
+    DPRINTF(Fetch, "Deocde Idle %d enableStarvationEMISSARY %d level %s oracleEMISSARY %d\n",
+            fromDecode->decodeIdle[tid], enableStarvationEMISSARY, level, oracleEMISSARY);
+
     if(enableStarvationEMISSARY){
         if(fromDecode->decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
-            DPRINTF(Fetch, "%#x %s %d ", (*memReq_it)->getVaddr(), level, resteer);
+            DPRINTF(Fetch, "%#x %s %d \n", (*memReq_it)->getVaddr(), level, resteer);
             resteer = false;
             RequestPtr mem_req2 = std::make_shared<Request>(
                 (*memReq_it)->getVaddr(), fetchBufferSize,
@@ -623,6 +633,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
                 }
                 //numStarves = pkt->starveCount;
 
+                DPRINTF(Fetch, "pureRandom %d and depth: %d\n",pureRandom, pkt->req->getAccessDepth());
                 if (!pureRandom && pkt->req->getAccessDepth()>=1) {
                     //fetchL2HitStarve++;
                     didWeStarve = true;
@@ -645,11 +656,17 @@ Fetch::processCacheCompletion(PacketPtr pkt)
                     //    DPRINTFN("BTB Miss Threshold met!\n");
                     //    btbMissThreshold = true;
                     //}
-                    if ((randomStarve && random < starveRandomness) || 
-                        (!randomStarve && starveAtleast==0) ||
-	    	            (!randomStarve && starveAtleast<=8 && numStarves >= starveAtleast)) {
-                        data_pkt2->setPreserve(true);
-                    } else {
+                    if(oracleEMISSARY){
+                        if(hasAddrInOracleMap(pkt->req->getVaddr())){
+                            data_pkt2->setPreserve(true);
+                        }
+                    }else{
+                        if ((randomStarve && random < starveRandomness) || 
+                            (!randomStarve && starveAtleast==0) ||
+	    	                (!randomStarve && starveAtleast<=8 && numStarves >= starveAtleast)) {
+                            data_pkt2->setPreserve(true);
+                        } else {
+                        }
                     }
                     icachePort.sendTimingStarvationReq(data_pkt2);
                 } 
@@ -3820,6 +3837,7 @@ Fetch::dumpBTBConfMap(){
 
     btbConfOut.close();
 }
+
 void
 Fetch::dumpTmsMap(){
 
@@ -3850,6 +3868,38 @@ Fetch::dumpTmsMap(){
 	}
 
     physTmsOut.close();
+}
+
+void
+Fetch::createOracleStarvationMap(){
+    std::cout<<"Reading "<<oracleStarvationsFileName <<" file"<<std::endl;
+
+    ifstream starveMapStream(oracleStarvationsFileName);
+
+    Addr vaddr;
+    int starvationCount;
+    if(starveMapStream.is_open()){
+      while(starveMapStream  >> std::hex >> vaddr
+              >> std::dec >> starvationCount ){
+          VaddrToStarvationCountMap[vaddr] = starvationCount;
+          //std::cout << vaddr <<" " << starvationCount << std::endl;
+      }
+    }
+
+}
+
+bool
+Fetch::hasAddrInOracleMap(Addr vaddr){
+    DPRINTF(Fetch, "Oracle EMISSARY Lookup %#x\n",vaddr);
+    Addr blockVaddr = fetchBufferAlignPC(vaddr); 
+    auto it = VaddrToStarvationCountMap.find(blockVaddr);
+    if ( it != VaddrToStarvationCountMap.end()){
+        if (it->second > oracleStarvationCountThreshold){
+            DPRINTF(Fetch, "Found %#x oracle vaddr\n", blockVaddr);
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace o3

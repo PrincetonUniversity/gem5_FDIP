@@ -364,6 +364,8 @@ class Fetch
     template<typename IterType> void cleanupFetchBuffer(IterType it, IterType end);
     void dumpBTBConfMap();
     void dumpTmsMap();
+    void createOracleStarvationMap();
+    bool hasAddrInOracleMap(Addr vaddr);
     /** Does the actual fetching of instructions and passing them on to the
      * next stage.
      * @param status_change fetch() sets this variable if there was a status
@@ -599,6 +601,10 @@ class Fetch
     Addr starvationPC[MaxThreads];
     int32_t numSets;
     std::map<Addr, Addr> V2PMap;
+    std::map<Addr, int> VaddrToStarvationCountMap;
+    bool oracleEMISSARY;
+    std::string oracleStarvationsFileName;
+    int oracleStarvationCountThreshold;
 
     /** Set to true if a pipelined I-cache request should be issued. */
     bool issuePipelinedIfetch[MaxThreads];

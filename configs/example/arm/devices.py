@@ -88,7 +88,6 @@ class L2(L2Cache):
     assoc = 16
     write_buffers = 32
     writeback_clean = True
-    #clusivity='mostly_excl'
 
 
 class L3(Cache):
@@ -181,6 +180,16 @@ class CpuCluster(SubSystem):
 
                 if args.ftqInst >0:
                     cpu.ftqInst = args.ftqInst
+
+                if args.oracleEMISSARY:
+                    cpu.oracleEMISSARY = args.oracleEMISSARY
+
+                if args.oracleStarvationsFileName:
+                    cpu.oracleStarvationsFileName = args.oracleStarvationsFileName
+
+                if args.oracleStarvationCountThreshold:
+                    cpu.oracleStarvationCountThreshold = args.oracleStarvationCountThreshold
+
 
                 if self._l1i_rp == "LRUEmissary" or self._l2_rp =="LRUEmissary":
                     cpu.enableStarvationEMISSARY = True

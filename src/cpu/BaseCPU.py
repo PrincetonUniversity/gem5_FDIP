@@ -190,6 +190,10 @@ class BaseCPU(ClockedObject):
     emissaryEnableIQEmpty = Param.Bool(False, "EMISSARY Set starvation bit only IQ is empty")
     enablePerfectICache = Param.Bool(False,"Enable perfect I-Cache")
     enableFDIP = Param.Bool(False, "Enable FDIP")
+    oracleEMISSARY = Param.Bool(False, "Enable Oracle EMISSARY")
+    oracleStarvationsFileName = Param.String("", "Starvation Map file name")
+    oracleStarvationCountThreshold = Param.Int(100, "Set the minimum starvation"
+                                       "starvation count limit for Oracle EMISSARY policy")
     # EMISSARY: END
 
     icache_port = RequestPort("Instruction Port")
