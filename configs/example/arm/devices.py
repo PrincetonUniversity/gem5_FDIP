@@ -73,7 +73,7 @@ class WalkCache(PageTableWalkerCache):
     response_latency = 0
     mshrs = 16
     tgts_per_mshr = 20
-    size = '1kB'
+    size = '32kB'
     assoc = 8
     write_buffers = 16
 
@@ -87,6 +87,7 @@ class L2(L2Cache):
     size = '1MB'
     assoc = 16
     write_buffers = 32
+    writeback_clean = True
     #clusivity='mostly_excl'
 
 
