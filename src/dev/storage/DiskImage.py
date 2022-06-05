@@ -47,3 +47,12 @@ class CowDiskImage(DiskImage):
                             "child image")
     table_size = Param.Int(65536, "initial table size")
     image_file = ""
+
+class QCow2DiskImage(DiskImage):
+    type = 'QCow2DiskImage'
+    cxx_header = "dev/storage/disk_image.hh"
+    cxx_class = 'gem5::QCow2DiskImage'
+    child = Param.DiskImage(RawDiskImage(read_only=True),
+                            "child image")
+    table_size = Param.Int(65536, "initial table size")
+    image_file = ""

@@ -38,6 +38,7 @@
 
 #include "params/CowDiskImage.hh"
 #include "params/DiskImage.hh"
+#include "params/QCow2DiskImage.hh"
 #include "params/RawDiskImage.hh"
 #include "sim/sim_object.hh"
 
@@ -126,6 +127,57 @@ class CowDiskImage : public DiskImage
     typedef CowDiskImageParams Params;
     CowDiskImage(const Params &p);
     ~CowDiskImage();
+
+    void notifyFork() override;
+
+    void initSectorTable(int hash_size);
+    bool open(const std::string &file);
+    void save() const;
+    void save(const std::string &file) const;
+    void writeback();
+
+    void serialize(CheckpointOut &cp) const override;
+    void unserialize(CheckpointIn &cp) override;
+
+    std::streampos size() const override;
+
+    std::streampos read(uint8_t *data, std::streampos offset) const override;
+    std::streampos write(const uint8_t *data, std::streampos offset) override;
+};
+
+
+/**
+ * Specialization for accessing a copy-on-write disk image layer.
+ * A copy-on-write(COW) layer must be stacked on top of another disk
+ * image layer this layer can be another QCow2DiskImage, or a
+ * RawDiskImage.
+ *
+ * This object is designed to provide a mechanism for persistant
+ * changes to a main disk image, or to provide a place for temporary
+ * changes to the image to take place that later may be thrown away.
+ */
+class QCow2DiskImage : public DiskImage
+{
+  public:
+    static const uint32_t VersionMajor;
+    static const uint32_t VersionMinor;
+
+  protected:
+    struct Sector
+    {
+        uint8_t data[SectorSize];
+    };
+    typedef std::unordered_map<uint64_t, Sector *> SectorTable;
+
+  protected:
+    std::string filename;
+    DiskImage *child;
+    SectorTable *table;
+
+  public:
+    typedef QCow2DiskImageParams Params;
+    QCow2DiskImage(const Params &p);
+    ~QCow2DiskImage();
 
     void notifyFork() override;
 

@@ -31,6 +31,7 @@
  */
 
 #include "dev/storage/disk_image.hh"
+#include "dev/storage/qcow2.h"
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -431,6 +432,230 @@ CowDiskImage::serialize(CheckpointOut &cp) const
 
 void
 CowDiskImage::unserialize(CheckpointIn &cp)
+{
+    std::string cowFilename;
+    UNSERIALIZE_SCALAR(cowFilename);
+    cowFilename = cp.getCptDir() + "/" + cowFilename;
+    open(cowFilename);
+}
+
+////////////////////////////////////////////////////////////////////////
+//
+// Copy on Write Disk image
+//
+const uint32_t QCow2DiskImage::VersionMajor = 1;
+const uint32_t QCow2DiskImage::VersionMinor = 0;
+
+QCow2DiskImage::QCow2DiskImage(const Params &p)
+    : DiskImage(p), filename(p.image_file), child(NULL), table(NULL)
+{
+    //qcow2_openFile(p.image_file.c_str());
+    //p.child->image_file = qcow2_getBackingFile();
+    //child = new RawDiskImage(p.child);
+
+    if (filename.empty()) {
+        initSectorTable(p.table_size);
+    } else {
+        if (!open(filename)) {
+            if (p.read_only)
+                fatal("could not open read-only file");
+            initSectorTable(p.table_size);
+        }
+
+        if (!p.read_only)
+            registerExitCallback([this]() { save(); });
+    }
+}
+
+QCow2DiskImage::~QCow2DiskImage()
+{
+    SectorTable::iterator i = table->begin();
+    SectorTable::iterator end = table->end();
+
+    while (i != end) {
+        delete (*i).second;
+        ++i;
+    }
+}
+
+void
+QCow2DiskImage::notifyFork()
+{
+    if (!dynamic_cast<const Params &>(params()).read_only &&
+        !filename.empty()) {
+        inform("Disabling saving of COW image in forked child process.\n");
+        filename = "";
+    }
+}
+
+bool
+QCow2DiskImage::open(const std::string &file)
+{
+    std::ifstream stream(file.c_str());
+    if (!stream.is_open())
+        return false;
+
+    if (stream.fail() || stream.bad())
+        panic("Error opening %s", file);
+
+    uint64_t magic;
+    SafeRead(stream, magic);
+
+    if (memcmp(&magic, "COWDISK!", sizeof(magic)) != 0)
+        panic("Could not open %s: Invalid magic", file);
+
+    uint32_t major_version, minor_version;
+    SafeReadSwap(stream, major_version);
+    SafeReadSwap(stream, minor_version);
+
+    if (major_version != VersionMajor && minor_version != VersionMinor)
+        panic("Could not open %s: invalid version %d.%d != %d.%d",
+              file, major_version, minor_version, VersionMajor, VersionMinor);
+
+    uint64_t sector_count;
+    SafeReadSwap(stream, sector_count);
+    table = new SectorTable(sector_count);
+
+
+    for (uint64_t i = 0; i < sector_count; i++) {
+        uint64_t offset;
+        SafeReadSwap(stream, offset);
+
+        Sector *sector = new Sector;
+        SafeRead(stream, sector, sizeof(Sector));
+
+        assert(table->find(offset) == table->end());
+        (*table)[offset] = sector;
+    }
+
+    stream.close();
+
+    initialized = true;
+    return true;
+}
+
+void
+QCow2DiskImage::initSectorTable(int hash_size)
+{
+    table = new SectorTable(hash_size);
+
+    initialized = true;
+}
+
+void
+QCow2DiskImage::save() const
+{
+    // filename will be set to the empty string to disable saving of
+    // the COW image in a forked child process. Save will still be
+    // called because there is no easy way to unregister the exit
+    // callback.
+    if (!filename.empty())
+        save(filename);}
+
+void
+QCow2DiskImage::save(const std::string &file) const
+{
+    if (!initialized)
+        panic("RawDiskImage not initialized");
+
+    std::ofstream stream(file.c_str());
+    if (!stream.is_open() || stream.fail() || stream.bad())
+        panic("Error opening %s", file);
+
+    uint64_t magic;
+    memcpy(&magic, "COWDISK!", sizeof(magic));
+    SafeWrite(stream, magic);
+
+    SafeWriteSwap(stream, (uint32_t)VersionMajor);
+    SafeWriteSwap(stream, (uint32_t)VersionMinor);
+    SafeWriteSwap(stream, (uint64_t)table->size());
+
+    uint64_t size = table->size();
+    SectorTable::iterator iter = table->begin();
+    SectorTable::iterator end = table->end();
+
+    for (uint64_t i = 0; i < size; i++) {
+        if (iter == end)
+            panic("Incorrect Table Size during save of COW disk image");
+
+        SafeWriteSwap(stream, (uint64_t)(*iter).first);
+        SafeWrite(stream, (*iter).second->data, sizeof(Sector));
+        ++iter;
+    }
+
+    stream.close();
+}
+
+void
+QCow2DiskImage::writeback()
+{
+    SectorTable::iterator i = table->begin();
+    SectorTable::iterator end = table->end();
+
+    while (i != end) {
+        child->write((*i).second->data, (*i).first);
+        ++i;
+    }
+}
+
+std::streampos
+QCow2DiskImage::size() const
+{ return child->size(); }
+
+std::streampos
+QCow2DiskImage::read(uint8_t *data, std::streampos offset) const
+{
+    if (!initialized)
+        panic("QCow2DiskImage not initialized");
+
+    if (offset > size())
+        panic("access out of bounds");
+
+    SectorTable::const_iterator i = table->find(offset);
+    if (i == table->end())
+        return child->read(data, offset);
+    else {
+        memcpy(data, (*i).second->data, SectorSize);
+        DPRINTF(DiskImageRead, "read: offset=%d\n", (uint64_t)offset);
+        DDUMP(DiskImageRead, data, SectorSize);
+        return SectorSize;
+    }
+}
+
+std::streampos
+QCow2DiskImage::write(const uint8_t *data, std::streampos offset)
+{
+    if (!initialized)
+        panic("RawDiskImage not initialized");
+
+    if (offset > size())
+        panic("access out of bounds");
+
+    SectorTable::iterator i = table->find(offset);
+    if (i == table->end()) {
+        Sector *sector = new Sector;
+        memcpy(sector, data, SectorSize);
+        table->insert(make_pair(offset, sector));
+    } else {
+        memcpy((*i).second->data, data, SectorSize);
+    }
+
+    DPRINTF(DiskImageWrite, "write: offset=%d\n", (uint64_t)offset);
+    DDUMP(DiskImageWrite, data, SectorSize);
+
+    return SectorSize;
+}
+
+void
+QCow2DiskImage::serialize(CheckpointOut &cp) const
+{
+    std::string cowFilename = name() + ".cow";
+    SERIALIZE_SCALAR(cowFilename);
+    save(CheckpointIn::dir() + "/" + cowFilename);
+}
+
+void
+QCow2DiskImage::unserialize(CheckpointIn &cp)
 {
     std::string cowFilename;
     UNSERIALIZE_SCALAR(cowFilename);
