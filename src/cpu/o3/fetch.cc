@@ -609,7 +609,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             fromDecode->decodeIdle[tid], enableStarvationEMISSARY, level, oracleEMISSARY);
 
     if(enableStarvationEMISSARY){
-        if(fromDecode->decodeIdle[tid] && *pc_it == fetchBufferBlockPC) {
+        if((fromDecode->decodeIdle[tid] || oracleEMISSARY) && *pc_it == fetchBufferBlockPC) {
             DPRINTF(Fetch, "%#x %s %d \n", (*memReq_it)->getVaddr(), level, resteer);
             resteer = false;
             RequestPtr mem_req2 = std::make_shared<Request>(

@@ -107,6 +107,7 @@ Commit::Commit(CPU *_cpu, const O3CPUParams &params)
       prevSeqNum(0),
       prevFetchTick(0),
       isPrevBranch(false),
+      prevCommCycle(0),
       instCount(1),
       prevLine(0),
       stats(_cpu, this)
@@ -176,6 +177,7 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
       ADD_STAT(fetchNonSpecResteerCost, "Resteer Cost in fetch"),
       ADD_STAT(fetchNonSpecStallCost, "Stall Cost in fetch"),
       ADD_STAT(fetchNonSpecCost, "Fetch Cost  in fetch"),
+      ADD_STAT(commPathMemStallCost, "Stalls by memory operations in retired path"),
       ADD_STAT(branchMispredicts, statistics::units::Count::get(),
                "The number of times a branch was mispredicted"),
       ADD_STAT(commPathBranchMispredicts, statistics::units::Count::get(),
@@ -220,6 +222,7 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
     fetchNonSpecResteerCost.prereq(fetchNonSpecResteerCost);
     fetchNonSpecStallCost.prereq(fetchNonSpecStallCost);
     fetchNonSpecCost.prereq(fetchNonSpecCost);
+    commPathMemStallCost.prereq(commPathMemStallCost);
     branchMispredicts.prereq(branchMispredicts);
     commPathBranchMispredicts.prereq(commPathBranchMispredicts);
 
@@ -1436,7 +1439,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
     if(head_inst->isControl()){
         prevBranchFetchTick = head_inst->fetchTick;
-	isPrevBranch = true;
+	    isPrevBranch = true;
     }else{
         isPrevBranch = false;
     }
@@ -1508,6 +1511,23 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     //    PseudoInst::m5exit(thread[tid]->getTC(), 1);
     //}
     
+    uint64_t cycleDiff = (curTick()/500 - prevCommCycle);
+    
+    if(cycleDiff > 1){
+        //Measure number of cycles from decode to commit of this instruction
+        //
+        uint64_t decodeTick = head_inst->fetchTick + head_inst->decodeTick;
+        
+        uint64_t decodeToCommitLatency = (curTick() - decodeTick)/500;
+        if(cycleDiff > decodeToCommitLatency){
+            stats.commPathMemStallCost += decodeToCommitLatency;
+        }else{
+            stats.commPathMemStallCost += cycleDiff;
+        }
+        DPRINTFN("MemInst stallCount %llu\n", cycleDiff);
+    }
+
+    prevCommCycle = curTick()/500;
     stats.decodeIdleNonSpecPath += head_inst->idleCycles;
     stats.decodeIdleIQEmptyNonSpecPath += (head_inst->instQOccDecode == 0 ) ? head_inst->idleIQEmptyCycles : 0;  
     if (head_inst->memlevel == 1)

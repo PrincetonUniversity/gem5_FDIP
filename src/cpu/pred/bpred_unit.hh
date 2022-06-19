@@ -324,8 +324,8 @@ class BPredUnit : public SimObject
     std::vector<History> predHist;
 
     /** The BTB. */
-    //DefaultBTB BTB;
-    IdealBTB BTB;
+    DefaultBTB BTB;
+    //IdealBTB BTB;
 
     /** The per-thread return address stack. */
     std::vector<ReturnAddrStack> RAS;

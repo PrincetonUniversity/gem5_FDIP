@@ -485,6 +485,7 @@ class Commit
     uint64_t prevSeqNum;
     uint64_t prevFetchTick;
     bool isPrevBranch;
+    uint64_t prevCommCycle;
     uint64_t instCount;
     Addr prevLine;
 
@@ -507,6 +508,7 @@ class Commit
         statistics::Scalar fetchNonSpecResteerCost;
         statistics::Scalar fetchNonSpecStallCost;
         statistics::Scalar fetchNonSpecCost;
+        statistics::Scalar commPathMemStallCost;
         /** Stat for the total number of branch mispredicts that caused a
          * squash.
          */
