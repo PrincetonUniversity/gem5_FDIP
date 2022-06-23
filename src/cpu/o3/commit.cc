@@ -178,6 +178,8 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
       ADD_STAT(fetchNonSpecStallCost, "Stall Cost in fetch"),
       ADD_STAT(fetchNonSpecCost, "Fetch Cost  in fetch"),
       ADD_STAT(commPathMemStallCost, "Stalls by memory operations in retired path"),
+      ADD_STAT(commPathFEStallCost, "Frontend stall cycles from fetch till decode in retired path"),
+      ADD_STAT(misSpecStallCost, "Cycles lost due to misspeculation"),
       ADD_STAT(branchMispredicts, statistics::units::Count::get(),
                "The number of times a branch was mispredicted"),
       ADD_STAT(commPathBranchMispredicts, statistics::units::Count::get(),
@@ -223,6 +225,8 @@ Commit::CommitStats::CommitStats(CPU *cpu, Commit *commit)
     fetchNonSpecStallCost.prereq(fetchNonSpecStallCost);
     fetchNonSpecCost.prereq(fetchNonSpecCost);
     commPathMemStallCost.prereq(commPathMemStallCost);
+    commPathFEStallCost.prereq(commPathFEStallCost);
+    misSpecStallCost.prereq(misSpecStallCost);
     branchMispredicts.prereq(branchMispredicts);
     commPathBranchMispredicts.prereq(commPathBranchMispredicts);
 
@@ -1521,6 +1525,19 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         uint64_t decodeToCommitLatency = (curTick() - decodeTick)/500;
         if(cycleDiff > decodeToCommitLatency){
             stats.commPathMemStallCost += decodeToCommitLatency;
+
+            uint64_t remainingStalls = cycleDiff - decodeToCommitLatency;
+            uint64_t fetchToDecodeLatency = (head_inst->decodeTick/500);
+            
+            uint64_t fetchCycle = head_inst->fetchTick/500;
+
+            if(remainingStalls > fetchToDecodeLatency){
+                stats.misSpecStallCost += (remainingStalls - fetchToDecodeLatency); 
+                stats.commPathFEStallCost += fetchToDecodeLatency; 
+            }else{
+                stats.commPathFEStallCost += remainingStalls; 
+            }
+
         }else{
             stats.commPathMemStallCost += cycleDiff;
         }

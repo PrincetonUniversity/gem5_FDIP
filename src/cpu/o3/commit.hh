@@ -509,6 +509,8 @@ class Commit
         statistics::Scalar fetchNonSpecStallCost;
         statistics::Scalar fetchNonSpecCost;
         statistics::Scalar commPathMemStallCost;
+        statistics::Scalar commPathFEStallCost;
+        statistics::Scalar misSpecStallCost;
         /** Stat for the total number of branch mispredicts that caused a
          * squash.
          */
