@@ -255,6 +255,8 @@ class CpuCluster(SubSystem):
                 if self._l1i_rp == "LRUEmissary":
                     l1i.replacement_policy = LRUEmissaryRP()
                     l1i.lru_ways = 2
+                    if self._args.hist_freq_cycles:
+                        l1i.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
                     if self._preserve_ways:
                         l1i.preserve_ways = self._preserve_ways
                         l1i.lru_ways = 8 - int(self._preserve_ways)
@@ -302,6 +304,10 @@ class CpuCluster(SubSystem):
             else:
                 self.l2.preserve_ways = 6
                 self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+
+            if self._args.hist_freq_cycles:
+                self.l2.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
+
         elif self._l2_rp == "LIP":
             self.l2.replacement_policy = LIPRP()
         elif self._l2_rp == "MLP":

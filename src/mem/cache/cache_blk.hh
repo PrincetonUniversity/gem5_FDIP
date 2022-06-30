@@ -286,6 +286,11 @@ class CacheBlk : public TaggedEntry
         //return (status & BlkPreserve) != 0;
         return (coherence & BlkPreserve) != 0;
     }
+
+    void clearPreserve()
+    {
+        clearCoherenceBits(BlkPreserve);
+    }
     //EMISSARY: END
 
     /**

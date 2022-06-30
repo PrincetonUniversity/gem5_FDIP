@@ -62,6 +62,7 @@
 #include "mem/packet.hh"
 #include "params/BaseSetAssoc.hh"
 #include "mem/cache/replacement_policies/opt_rp.hh"
+#include "mem/cache/replacement_policies/lru_emissary_rp.hh"
 
 namespace gem5
 {

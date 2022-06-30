@@ -68,11 +68,23 @@ BaseSetAssoc::BaseSetAssoc(const Params &p)
     if(OPTPolicy){
         OPTPolicy->tags = this;
     }
+
+    auto *EmissaryPolicy = dynamic_cast<replacement_policy::LRUEmissary*>(replacementPolicy);
+    if(EmissaryPolicy){
+        EmissaryPolicy->indexingPolicy = indexingPolicy;
+        EmissaryPolicy->numWays = p.assoc;
+        EmissaryPolicy->numSets = numBlocks/p.assoc;
+    }
 }
 
 void
 BaseSetAssoc::tagsInit()
 {
+    //Initialize indexing policy of EMISSARY policy to be able to flush preserve bits at regular intervals
+    auto *EmissaryPolicy = dynamic_cast<replacement_policy::LRUEmissary*>(replacementPolicy);
+    if(EmissaryPolicy){
+        EmissaryPolicy->indexingPolicy = indexingPolicy;
+    }
     // Initialize all blocks
     for (unsigned blk_index = 0; blk_index < numBlocks; blk_index++) {
         // Locate next cache block

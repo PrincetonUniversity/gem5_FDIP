@@ -30,10 +30,12 @@
 
 #include <cassert>
 #include <memory>
+#include <map>
 
 #include "params/LRUEmissaryRP.hh"
 #include "sim/core.hh"
 #include "base/trace.hh"
+#include "base/output.hh"
 
 namespace gem5
 {
@@ -44,8 +46,11 @@ namespace replacement_policy
 
 LRUEmissary::LRUEmissary(const Params &p)
     : Base(p), lru_ways(p.lru_ways),
-    preserve_ways(p.preserve_ways)
+    preserve_ways(p.preserve_ways),
+    last_tick(0),
+    flush_freq_in_cycles(p.flush_freq_in_cycles)
 {
+        registerExitCallback([this]() { dumpPreserveHist(); });
 }
 
 void
@@ -59,6 +64,8 @@ LRUEmissary::invalidate(const std::shared_ptr<ReplacementData>& replacement_data
 void
 LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
+    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    non_const_this->checkToFlushPreserveBits();
     // Update last touch timestamp
     std::static_pointer_cast<LRUEmissaryReplData>(
         replacement_data)->lastTouchTick = curTick();
@@ -67,6 +74,8 @@ LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) con
 void
 LRUEmissary::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
+    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    non_const_this->checkToFlushPreserveBits();
     // Set last touch timestamp
     std::static_pointer_cast<LRUEmissaryReplData>(
         replacement_data)->lastTouchTick = curTick();
@@ -77,6 +86,9 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
 {
     // There must be at least one replacement candidate
     assert(candidates.size() > 0);
+
+    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    non_const_this->checkToFlushPreserveBits();
 
     // Visit all candidates to find victim
     ReplaceableEntry* victim = candidates[0];
@@ -209,6 +221,69 @@ std::shared_ptr<ReplacementData>
 LRUEmissary::instantiateEntry()
 {
     return std::shared_ptr<ReplacementData>(new LRUEmissaryReplData());
+}
+
+void 
+LRUEmissary::checkToFlushPreserveBits(){
+
+    if (flush_freq_in_cycles == 0){
+        return;
+    }
+
+    uint64_t cur_tick = curTick();
+
+    uint64_t diff = (cur_tick - last_tick)/500;
+
+    if ( diff >= flush_freq_in_cycles){
+        dumpPreserveHist();
+        last_tick = cur_tick;
+    }
+}
+
+void
+LRUEmissary::dumpPreserveHist(){
+    ofstream histOut; 
+    histOut.open(simout.directory()+"/set_hist.csv",fstream::app);
+
+    histOut << curTick()/500 <<",";
+    std::map<int,int> preserveCountHist;
+
+    for(int i=0;i<numWays;i++){
+        preserveCountHist[i] = 0;
+    }
+
+    for( int set=0; set < numSets; set++){
+        
+        int numPreserved=0;
+        
+        for(int way=0; way < numWays; way++){
+
+            ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
+            CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
+            if(blk->isPreserve()){
+                numPreserved++;
+            }
+
+            blk->clearPreserve();
+            //Erase preserve bit here
+        }
+
+        if(numPreserved >= preserve_ways){
+            preserveCountHist[preserve_ways]++;
+            //histOut << preserve_ways <<",";
+        }else{
+            preserveCountHist[numPreserved]++;
+            //histOut << numPreserved <<",";
+        }
+    }
+
+    for(int i=0;i<numWays;i++){
+        histOut << preserveCountHist[i] << ",";
+    }
+
+    histOut << "\n";
+
+    histOut.close();
 }
 
 } // namespace replacement_policy

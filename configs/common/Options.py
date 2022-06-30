@@ -176,6 +176,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--l2_rp", type=str, default="LRU")
     parser.add_argument("--lru_ways", type=int, default=2)
     parser.add_argument("--preserve_ways", type=int, default=6)
+    parser.add_argument("--hist_freq_cycles", type=int, default=0)
     parser.add_argument("--totalSimInsts", type=int, default=105000000)
 
     # Enable Ruby

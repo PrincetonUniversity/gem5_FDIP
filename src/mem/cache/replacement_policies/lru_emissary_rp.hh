@@ -36,7 +36,10 @@
 #define __MEM_CACHE_REPLACEMENT_POLICIES_LRU_EMISSARY_RP_HH__
 
 #include "mem/cache/replacement_policies/base.hh"
+#include "mem/cache/base.hh"
+#include "mem/cache/tags/base.hh"
 #include "mem/cache/cache_blk.hh"
+#include "mem/cache/tags/indexing_policies/base.hh"
 
 namespace gem5
 {
@@ -67,6 +70,13 @@ class LRUEmissary : public Base
     typedef LRUEmissaryRPParams Params;
     int lru_ways;
     int preserve_ways;
+    uint64_t last_tick;
+    int numSets;
+    int numWays;
+    uint64_t flush_freq_in_cycles;
+
+    /** Indexing policy */
+    BaseIndexingPolicy *indexingPolicy;
 
     /**
      * Construct and initiliaze this replacement policy.
@@ -122,6 +132,10 @@ class LRUEmissary : public Base
      * @return A shared pointer to the new replacement data.
      */
     std::shared_ptr<ReplacementData> instantiateEntry() override;
+
+    void dumpPreserveHist();
+    
+    void checkToFlushPreserveBits();
 };
 
 } // namespace replacement_policy

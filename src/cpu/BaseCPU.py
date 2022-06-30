@@ -187,7 +187,7 @@ class BaseCPU(ClockedObject):
     histRandom = Param.Bool(False, "HistRandom")
     ftqSize = Param.Int(24, "Fetch target queue size")
     ftqInst = Param.Int(192, "Fetch target queue size")
-    emissaryEnableIQEmpty = Param.Bool(False, "EMISSARY Set starvation bit only IQ is empty")
+    emissaryEnableIQEmpty = Param.Bool(True, "EMISSARY Set starvation bit only IQ is empty")
     enablePerfectICache = Param.Bool(False,"Enable perfect I-Cache")
     enableFDIP = Param.Bool(False, "Enable FDIP")
     oracleEMISSARY = Param.Bool(False, "Enable Oracle EMISSARY")
