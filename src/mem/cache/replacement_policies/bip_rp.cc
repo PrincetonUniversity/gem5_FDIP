@@ -61,5 +61,27 @@ BIP::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
     }
 }
 
+void
+BIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst) const
+{
+    std::shared_ptr<LRUReplData> casted_replacement_data =
+        std::static_pointer_cast<LRUReplData>(replacement_data);
+
+    DPRINTFN("BIP INST_ONLY is inst %d\n",is_inst);
+
+    if(!is_inst){
+        casted_replacement_data->lastTouchTick = curTick();
+        return; 
+    }
+
+    // Entries are inserted as MRU if lower than btp, LRU otherwise
+    if (random_mt.random<unsigned>(1, 100) <= btp) {
+        casted_replacement_data->lastTouchTick = curTick();
+    } else {
+        // Make their timestamps as old as possible, so that they become LRU
+        casted_replacement_data->lastTouchTick = 1;
+    }
+}
+
 } // namespace replacement_policy
 } // namespace gem5

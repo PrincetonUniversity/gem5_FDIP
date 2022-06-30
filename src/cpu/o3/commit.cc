@@ -1531,17 +1531,18 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
             
             uint64_t fetchCycle = head_inst->fetchTick/500;
 
-            if(remainingStalls > fetchToDecodeLatency){
-                stats.misSpecStallCost += (remainingStalls - fetchToDecodeLatency); 
-                stats.commPathFEStallCost += fetchToDecodeLatency; 
-            }else{
-                stats.commPathFEStallCost += remainingStalls; 
-            }
+            stats.commPathFEStallCost += remainingStalls; 
+            
+            //if(remainingStalls > fetchToDecodeLatency){
+            //    stats.misSpecStallCost += (remainingStalls - fetchToDecodeLatency); 
+            //    stats.commPathFEStallCost += fetchToDecodeLatency; 
+            //}else{
+            //    stats.commPathFEStallCost += remainingStalls; 
+            //}
 
         }else{
             stats.commPathMemStallCost += cycleDiff;
         }
-        DPRINTFN("MemInst stallCount %llu\n", cycleDiff);
     }
 
     prevCommCycle = curTick()/500;

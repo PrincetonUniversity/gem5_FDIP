@@ -83,6 +83,7 @@ class SBIP : public LRU
                                                                      override;
     void starveMRU(const std::shared_ptr<ReplacementData>& replacement_data) const
                                                                      override;
+    void reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst) const override;
 };
 
 } // namespace replacement_policy

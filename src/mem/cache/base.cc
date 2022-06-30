@@ -391,6 +391,13 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
 
     CacheBlk *blk = tags->findBlock(pkt->getAddr(), pkt->isSecure());
 
+    if(pkt->req->getAccessDepth() == 1){
+        tags->starveMRU(pkt->getAddr(), pkt->isSecure());
+
+        delete pkt;
+        return true;
+    }
+
     if (blk) {
         if (pkt->isStarved()){
             //blk->coherence |= CacheBlk::BlkStarved;
@@ -404,10 +411,15 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
         tags->starveMRU(pkt->getAddr(), pkt->isSecure());
         DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
                 blk ? "hit " + blk->print() : "miss");
-        delete pkt;
+
+        pkt->req->incAccessDepth();
+        memSidePort.sendTimingStarvationReq(pkt);
         return true;
     } 
-    delete pkt;
+
+    pkt->req->incAccessDepth();
+    memSidePort.sendTimingStarvationReq(pkt);
+
     return false;
 }
 
@@ -1676,6 +1688,11 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
         blk_size_bits = comp_data->getSizeBits();
     }
 
+    if (pkt->req->isInstFetch()){
+        DPRINTFN("INST_FETCH\n");
+    }else{
+        DPRINTFN("DATA_FETCH\n");
+    }
     // Find replacement victim
     std::vector<CacheBlk*> evict_blks;
     CacheBlk *victim = tags->findVictim(addr, is_secure, blk_size_bits,

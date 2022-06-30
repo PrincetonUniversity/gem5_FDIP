@@ -33,6 +33,7 @@ class BaseReplacementPolicy(SimObject):
     abstract = True
     cxx_class = 'gem5::replacement_policy::Base'
     cxx_header = "mem/cache/replacement_policies/base.hh"
+    inst_only = Param.Bool(False, "Enable Inst ONLY for L2 Policy")
 
 class DuelingRP(BaseReplacementPolicy):
     type = 'DuelingRP'
@@ -90,14 +91,17 @@ class BIPRP(LRURP):
     cxx_class = 'gem5::replacement_policy::BIP'
     cxx_header = "mem/cache/replacement_policies/bip_rp.hh"
     btp = Param.Percent(3, "Percentage of blocks to be inserted as MRU")
+    inst_only = True
 
 class SBIPRP(LRURP):
     type = 'SBIPRP'
     cxx_class = 'gem5::replacement_policy::SBIP'
     cxx_header = "mem/cache/replacement_policies/sbip_rp.hh"
+    inst_only = True
 
 class LIPRP(BIPRP):
     btp = 0
+    inst_only = True
 
 class MRURP(BaseReplacementPolicy):
     type = 'MRURP'

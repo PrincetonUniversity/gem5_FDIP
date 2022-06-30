@@ -115,6 +115,9 @@ class CoherentXBar : public BaseXBar
         bool
         recvTimingStarvationReq(PacketPtr pkt) override
         {
+            if(pkt->req->getAccessDepth() == 1){
+                return xbar.memSidePorts[0]->sendTimingStarvationReq(pkt);
+            }
             return true;
         }
 

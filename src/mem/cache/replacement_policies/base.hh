@@ -36,6 +36,7 @@
 #include "mem/packet.hh"
 #include "params/BaseReplacementPolicy.hh"
 #include "sim/sim_object.hh"
+#include "base/trace.hh"
 
 namespace gem5
 {
@@ -55,8 +56,9 @@ namespace replacement_policy
 class Base : public SimObject
 {
   public:
+    bool inst_only;
     typedef BaseReplacementPolicyParams Params;
-    Base(const Params &p) : SimObject(p) {}
+    Base(const Params &p) : SimObject(p), inst_only(p.inst_only) {}
     virtual ~Base() = default;
 
     /**
@@ -90,14 +92,24 @@ class Base : public SimObject
     virtual void reset(const std::shared_ptr<ReplacementData>&
         replacement_data, const PacketPtr pkt)
     {
-        reset(replacement_data);
+        if(inst_only){
+             reset_inst_line(replacement_data, pkt->req->isInstFetch());
+        }else{
+            reset(replacement_data);
+        }
     }
+
     virtual void reset(const std::shared_ptr<ReplacementData>&
         replacement_data) const = 0;
 
     virtual void starveMRU(const std::shared_ptr<ReplacementData>&
                                                 replacement_data) const { return; };
 
+    virtual void reset_inst_line(const std::shared_ptr<ReplacementData>&
+        replacement_data, bool is_inst) const
+    {
+        return;
+    }
     /**
      * Find replacement victim among candidates.
      *
