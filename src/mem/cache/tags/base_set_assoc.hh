@@ -129,6 +129,24 @@ class BaseSetAssoc : public BaseTags
      */
     CacheBlk* accessBlock(const PacketPtr pkt, Cycles &lat) override
     {
+
+
+        //int dummyVal = stats.dummyReset.result();
+        //if(dummyVal == 0){
+        //    DPRINTFN("dummy Reset is 0\n");
+        //    auto *EmissaryPolicy = dynamic_cast<replacement_policy::LRUEmissary*>(replacementPolicy);
+        //    if(EmissaryPolicy){
+        //        EmissaryPolicy->dumpPreserveHist();
+        //    }
+
+        //    stats.dummyReset += 1;
+        //}
+
+        //if(EmissaryPolicy){
+        //    EmissarPolicy->checkToFlushPreserveBits();
+        //}
+
+
         CacheBlk *blk = findBlock(pkt->getAddr(), pkt->isSecure());
 
         // Access all tags in parallel, hence one in each way.  The data side

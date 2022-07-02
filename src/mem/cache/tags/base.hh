@@ -157,6 +157,9 @@ class BaseTags : public ClockedObject
         statistics::Scalar tagAccesses;
         /** Number of data blocks consulted over all accesses. */
         statistics::Scalar dataAccesses;
+
+        /** used to reset Preserve status in EMISSARY **/
+        statistics::Scalar dummyReset;
     } stats;
 
   public:

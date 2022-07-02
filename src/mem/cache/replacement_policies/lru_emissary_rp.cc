@@ -264,7 +264,7 @@ LRUEmissary::dumpPreserveHist(){
                 numPreserved++;
             }
 
-            blk->clearPreserve();
+            //blk->clearPreserve();
             //Erase preserve bit here
         }
 
@@ -274,6 +274,18 @@ LRUEmissary::dumpPreserveHist(){
         }else{
             preserveCountHist[numPreserved]++;
             //histOut << numPreserved <<",";
+        }
+
+        //Erase only saturated sets
+        if(numPreserved >= preserve_ways){
+            for(int way=0; way < numWays; way++){
+
+                ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
+                CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
+
+                blk->clearPreserve();
+                //Erase preserve bit here
+            }
         }
     }
 

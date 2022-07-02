@@ -252,7 +252,9 @@ BaseTags::BaseTagStats::BaseTagStats(BaseTags &_tags)
     ADD_STAT(tagAccesses, statistics::units::Count::get(),
              "Number of tag accesses"),
     ADD_STAT(dataAccesses, statistics::units::Count::get(),
-             "Number of data accesses")
+             "Number of data accesses"),
+    ADD_STAT(dummyReset, statistics::units::Count::get(),
+              "A dummy stat to identify reset")
 {
 }
 
