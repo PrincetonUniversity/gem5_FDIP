@@ -89,12 +89,13 @@ class CacheBlk : public TaggedEntry
 
         /** Nayana added - Line that caused Decode Starvation */
         BlkStarved =        0x10,
-        BlkPreserve =        0x200,
+        BlkPreserve =       0x200,
+        BlkUsed =           0x400,
         /**
          * Helper enum value that includes all other bits. Whenever a new
          * bits is added, this should be updated.
          */
-        AllBits  =          0x21E,
+        AllBits  =          0x61E,
     };
 
     /**
@@ -279,6 +280,21 @@ class CacheBlk : public TaggedEntry
     {
         //return (status & BlkStarved) != 0;
         return (coherence & BlkStarved) != 0;
+    }
+
+    bool isUsed() const
+    {
+        return (coherence & BlkUsed) != 0;
+    }
+
+    void setUsed()
+    {
+        setCoherenceBits(BlkUsed); 
+    }
+
+    void clearUsed()
+    {
+        clearCoherenceBits(BlkUsed);
     }
 
     bool isPreserve() const

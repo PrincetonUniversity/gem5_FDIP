@@ -66,6 +66,7 @@ LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) con
 {
     auto *non_const_this = const_cast<LRUEmissary*>(this);
     non_const_this->checkToFlushPreserveBits();
+
     // Update last touch timestamp
     std::static_pointer_cast<LRUEmissaryReplData>(
         replacement_data)->lastTouchTick = curTick();
@@ -264,6 +265,12 @@ LRUEmissary::dumpPreserveHist(){
                 numPreserved++;
             }
 
+            if(!blk->isUsed()){
+                DPRINTFN("Used line\n");
+                blk->clearPreserve();
+                //Erase preserve bit here
+            }
+            blk->clearUsed();
             //blk->clearPreserve();
             //Erase preserve bit here
         }
@@ -276,17 +283,21 @@ LRUEmissary::dumpPreserveHist(){
             //histOut << numPreserved <<",";
         }
 
-        //Erase only saturated sets
-        if(numPreserved >= preserve_ways){
-            for(int way=0; way < numWays; way++){
+        ////Erase only saturated sets
+        //if(numPreserved >= preserve_ways){
+        //    for(int way=0; way < numWays; way++){
 
-                ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
-                CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
+        //        ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
+        //        CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
 
-                blk->clearPreserve();
-                //Erase preserve bit here
-            }
-        }
+        //        DPRINTFN("Ref Count is %d\n",blk->getRefCount());
+        //        if(blk->getRefCount() <= 1){
+        //            DPRINTFN("Clearing\n");
+        //            blk->clearPreserve();
+        //            //Erase preserve bit here
+        //        }
+        //    }
+        //}
     }
 
     for(int i=0;i<numWays;i++){
