@@ -31,6 +31,7 @@
 #include "base/intmath.hh"
 #include "base/trace.hh"
 #include "debug/Fetch.hh"
+#include "debug/PreDecodeBTB.hh"
 
 namespace gem5
 {
@@ -127,9 +128,28 @@ DefaultBTB::valid(Addr instPC, ThreadID tid)
         && btb[btb_idx].tid == tid) {
         return true;
     } else {
-        return false;
+        return validBPB(instPC, tid);
     }
 }
+
+bool
+DefaultBTB::validBPB(Addr instPC, ThreadID tid)
+{
+    Addr inst_tag = getTag(instPC);
+
+    Addr lookupPC = instPC;
+
+    for (int i=0; i<32; i++){
+        if (bpb[lookupPC].valid
+    //        && inst_tag == bpb[lookupPC].tag
+            && bpb[lookupPC].tid == tid) {
+            return true;
+        }
+        lookupPC += 4;
+    }
+    return false;
+}
+
 
 int
 DefaultBTB::getBblIndex(Addr instPC, ThreadID tid){
@@ -199,8 +219,31 @@ DefaultBTB::lookupBranch(Addr instPC, ThreadID tid)
         && btb[btb_idx].tid == tid) {
         return btb[btb_idx].staticBranchInst;
     } else {
-        return 0;
+        // Lookup BPB here
+        return lookupBranchBPB(instPC, tid);
     }
+}
+
+StaticInstPtr
+DefaultBTB::lookupBranchBPB(Addr instPC, ThreadID tid)
+{
+    Addr inst_tag = getTag(instPC);
+
+    Addr lookupPC = instPC;
+
+    for (int i=0; i<32; i++){
+
+        DPRINTF(PreDecodeBTB, "BPB:  lookup branchPC: 0x%llx\n", lookupPC); 
+
+        if (bpb[lookupPC].valid
+    //        && inst_tag == bpb[lookupPC].tag
+            && bpb[lookupPC].tid == tid) {
+            DPRINTF(PreDecodeBTB, "BPB: hit bblAddr: 0x%llx branchPC: 0x%llx\n", instPC, bpb[lookupPC].branch.instAddr()); 
+            return bpb[lookupPC].staticBranchInst;
+        }
+        lookupPC += 4;
+    }
+    return 0;
 }
 
 TheISA::PCState
@@ -217,8 +260,26 @@ DefaultBTB::lookupBranchPC(Addr instPC, ThreadID tid)
         && btb[btb_idx].tid == tid) {
         return btb[btb_idx].branch;
     } else {
-        return 0;
+        return lookupBranchPCBPB(instPC, tid);
     }
+}
+
+TheISA::PCState
+DefaultBTB::lookupBranchPCBPB(Addr instPC, ThreadID tid)
+{
+    Addr inst_tag = getTag(instPC);
+
+    Addr lookupPC = instPC;
+
+    for (int i=0; i<32; i++){
+        if (bpb[lookupPC].valid
+    //        && inst_tag == bpb[lookupPC].tag
+            && bpb[lookupPC].tid == tid) {
+            return bpb[lookupPC].branch;
+        }
+        lookupPC += 4;
+    }
+    return 0;
 }
 
 uint64_t
@@ -253,8 +314,29 @@ DefaultBTB::lookup(Addr instPC, ThreadID tid)
         && btb[btb_idx].tid == tid) {
         return btb[btb_idx].target;
     } else {
-        return 0;
+        return lookupBPB(instPC, tid);
     }
+}
+
+TheISA::PCState
+DefaultBTB::lookupBPB(Addr instPC, ThreadID tid)
+{
+    Addr inst_tag = getTag(instPC);
+
+    Addr lookupPC = instPC;
+
+    for (int i=0; i<32; i++){
+        //DPRINTF(PreDecodeBTB, "BPB:  lookup branchPC: 0x%llx\n", lookupPC); 
+
+        if (bpb[lookupPC].valid
+            //&& inst_tag == bpb[lookupPC].tag
+            && bpb[lookupPC].tid == tid) {
+            DPRINTF(PreDecodeBTB, "BPB: hit bblAddr: 0x%llx branchPC: 0x%llx\n", instPC, bpb[lookupPC].branch.instAddr()); 
+            return bpb[lookupPC].target;
+        }
+        lookupPC += 4;
+    }
+    return 0;
 }
 
 TheISA::PCState
@@ -336,6 +418,29 @@ DefaultBTB::update(Addr instPC, const StaticInstPtr &staticBranchInst,
     //    btb[leader_btb_idx].tag = getTag(block);
     //    btb[leader_btb_idx].uncond = uncond;
     //}
+}
+
+void
+DefaultBTB::updateBPB(Addr instPC, const StaticInstPtr &staticBranchInst, 
+                   const TheISA::PCState &branch,
+                   const uint64_t bblSize, const TheISA::PCState &target, 
+                   const TheISA::PCState &ft, bool uncond, ThreadID tid)
+{
+    Addr bpb_idx = instPC; 
+    
+    //    DPRINTF(PreDecodeBTB, "BTB update bpb_index: 0x%llx staticBrancInst 0x%lx target %s branchPC: %s\n", 
+	//	    bpb_idx, &*staticBranchInst, target, branch);
+
+    bpb[bpb_idx].tid = tid;
+    bpb[bpb_idx].valid = true;
+    bpb[bpb_idx].staticBranchInst = staticBranchInst;
+    bpb[bpb_idx].branch = branch;
+    bpb[bpb_idx].bblSize = bblSize;
+    bpb[bpb_idx].target = target;
+    bpb[bpb_idx].fallthrough = ft;
+    bpb[bpb_idx].tag = getTag(instPC);
+    bpb[bpb_idx].uncond = uncond;
+
 }
 } // namespace branch_prediction
 } // namespace gem5

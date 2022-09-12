@@ -159,6 +159,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--randomStarve", action="store_true", default=False)
     parser.add_argument("--perfectICache", action="store_true", default=False)
     parser.add_argument("--fdip", action="store_true", default=False)
+    parser.add_argument("--bpb", action="store_true", default=False)
     parser.add_argument("--pureRandom", action="store_true", default=False)
     parser.add_argument("--dump-tms", action="store_true", default=False)
     parser.add_argument("--dump-btbconf", action="store_true", default=False)

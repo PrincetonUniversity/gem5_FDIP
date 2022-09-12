@@ -145,6 +145,7 @@ Fetch::Fetch(CPU *_cpu, const O3CPUParams &params)
       numFetchingThreads(params.smtNumFetchingThreads),
       enablePerfectICache(params.enablePerfectICache),
       enableFDIP(params.enableFDIP),
+      enableBPB(params.enableBPB),
       dumpTms(params.dumpTms),
       dumpBTBConf(params.dumpBTBConf),
       btbConfMinInst(params.btbConfMinInst),
@@ -2532,7 +2533,7 @@ Fetch::preDecodeAllLines(){
         }
 
         if(*pc_it == *actual_pc_it){
-            DPRINTFN("SKIP: 0x%llx\n", *pc_it);
+            DPRINTF(PreDecode, "SKIP: 0x%llx\n", *pc_it);
             continue;
         }
 
@@ -2540,11 +2541,11 @@ Fetch::preDecodeAllLines(){
         // TODO: Fix this case later
         // Ideally such a case should not happen
         if((*pc_it >> CACHE_LINE_SIZE_WIDTH) != (*actual_pc_it >> CACHE_LINE_SIZE_WIDTH)){
-            DPRINTFN("SKIP: 0x%llx\n", *pc_it);
+            DPRINTF(PreDecode, "SKIP: 0x%llx\n", *pc_it);
             continue;
         }
 
-        DPRINTFN("pc_it: 0x%llx actual PC: 0x%llx\n", *pc_it, *actual_pc_it);
+        DPRINTF(PreDecode, "pc_it: 0x%llx actual PC: 0x%llx\n", *pc_it, *actual_pc_it);
         TheISA::PCState thisPC = lastPrefPC;
 
         thisPC.pc(*pc_it);
@@ -2633,14 +2634,16 @@ Fetch::preDecodeAllLines(){
                 if (staticInst->isDirectCtrl()) {
                     DPRINTF(PreDecode, "PREDECODE BBLInsert Inserting Direct ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
                             bblPC.instAddr(), thisPC.instAddr(), staticInst->branchTarget(thisPC), thisPC.instAddr() - bblPC.instAddr());
-                    //branchPred->BTBUpdate(bblPC.instAddr(),
-                    //                      staticInst,
-                    //                      thisPC,
-                    //                      thisPC.instAddr() - bblPC.instAddr(),
-                    //                      staticInst->branchTarget(thisPC),
-                    //                      nextPC,
-                    //                      staticInst->isUncondCtrl(),
-                    //                      tid);
+                    if(enableBPB){
+                        branchPred->BPBUpdate(thisPC.instAddr(),
+                                              staticInst,
+                                              thisPC,
+                                              thisPC.instAddr() - bblPC.instAddr(),
+                                              staticInst->branchTarget(thisPC),
+                                              nextPC,
+                                              staticInst->isUncondCtrl(),
+                                              tid);
+                    }
                     //assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
                     bblPC = nextPC;
                 } else if(staticInst->isControl()){

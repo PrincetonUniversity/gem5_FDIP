@@ -567,6 +567,9 @@ class Fetch
 
     /** Enable FDIP **/
     bool enableFDIP;
+    
+    /** Enable Branch Predecode Buffer **/
+    bool enableBPB;
 
     /** Enable dumping of TMS Stats **/
     bool dumpTms;

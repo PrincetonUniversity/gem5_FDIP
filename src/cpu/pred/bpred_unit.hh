@@ -217,6 +217,12 @@ class BPredUnit : public SimObject
                 const TheISA::PCState &ft, bool uncond, ThreadID tid)
     { BTB.update(instPC, staticBranchInst, branch, bblSize, target, ft, uncond, tid); }
 
+    void BPBUpdate(Addr instPC, const StaticInstPtr &staticBranchInst, 
+                const TheISA::PCState &branch,
+                const uint64_t bblSize, const TheISA::PCState &target, 
+                const TheISA::PCState &ft, bool uncond, ThreadID tid)
+    { BTB.updateBPB(instPC, staticBranchInst, branch, bblSize, target, ft, uncond, tid); }
+
 
     void dump();
     

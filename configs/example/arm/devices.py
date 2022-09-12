@@ -142,6 +142,9 @@ class CpuCluster(SubSystem):
                 if args.fdip:
                     cpu.enableFDIP = args.fdip
 
+                if args.bpb:
+                    cpu.enableBPB = args.bpb
+
                 if args.perfectICache:
                     cpu.enablePerfectICache = args.perfectICache
 

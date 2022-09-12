@@ -98,6 +98,9 @@ class DefaultBTB
     StaticInstPtr lookupBranch(Addr instPC, ThreadID tid);
     TheISA::PCState lookupBranchPC(Addr instPC, ThreadID tid);
 
+    StaticInstPtr lookupBranchBPB(Addr instPC, ThreadID tid);
+    TheISA::PCState lookupBranchPCBPB(Addr instPC, ThreadID tid);
+
     uint64_t lookupBblSize(Addr instPC, ThreadID tid);
 
     /** Looks up an address in the BTB. Must call valid() first on the address.
@@ -106,6 +109,8 @@ class DefaultBTB
      *  @return Returns the target of the branch.
      */
     TheISA::PCState lookup(Addr instPC, ThreadID tid);
+
+    TheISA::PCState lookupBPB(Addr instPC, ThreadID tid);
 
     /** Looks up an address in the BTB. Must call valid() first on the address.
      *  @param inst_PC The address of the basic block to look up.
@@ -123,6 +128,8 @@ class DefaultBTB
      */
     bool valid(Addr instPC, ThreadID tid);
 
+    bool validBPB(Addr instPC, ThreadID tid);
+
     /** Updates the BTB with the target of a branch.
      *  @param inst_PC The address of the branch being updated.
      *  @param target_PC The target address of the branch.
@@ -131,8 +138,15 @@ class DefaultBTB
     void update(Addr instPC, const TheISA::PCState &targetPC,
                 ThreadID tid);
 
+
     // Nayana added
     void update(Addr instPC, const StaticInstPtr &staticBranchInst, 
+                const TheISA::PCState &branch,
+                const uint64_t bblSize, const TheISA::PCState &target, 
+                const TheISA::PCState &ft, bool uncond, ThreadID tid);
+
+    // Bhargav added
+    void updateBPB(Addr instPC, const StaticInstPtr &staticBranchInst, 
                 const TheISA::PCState &branch,
                 const uint64_t bblSize, const TheISA::PCState &target, 
                 const TheISA::PCState &ft, bool uncond, ThreadID tid);
@@ -152,6 +166,9 @@ class DefaultBTB
 
     /** The actual BTB. */
     std::vector<BTBEntry> btb;
+
+    /** Branch Pre-decode Buffer **/
+    std::map<Addr, BTBEntry> bpb;
 
     /** The number of entries in the BTB. */
     unsigned numEntries;
