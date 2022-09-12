@@ -103,6 +103,8 @@ class DefaultBTB
 
     uint64_t lookupBblSize(Addr instPC, ThreadID tid);
 
+    uint64_t lookupBblSizeBPB(Addr instPC, ThreadID tid);
+
     /** Looks up an address in the BTB. Must call valid() first on the address.
      *  @param inst_PC The address of the branch to look up.
      *  @param tid The thread id.

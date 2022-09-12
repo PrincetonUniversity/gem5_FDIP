@@ -296,8 +296,29 @@ DefaultBTB::lookupBblSize(Addr instPC, ThreadID tid)
         && btb[btb_idx].tid == tid) {
         return btb[btb_idx].bblSize;
     } else {
-        return 0;
+        return lookupBblSizeBPB(instPC, tid);
     }
+}
+
+uint64_t
+DefaultBTB::lookupBblSizeBPB(Addr instPC, ThreadID tid)
+{
+    Addr inst_tag = getTag(instPC);
+
+    Addr lookupPC = instPC;
+
+    for (int i=0; i<32; i++){
+        //DPRINTF(PreDecodeBTB, "BPB:  lookup branchPC: 0x%llx\n", lookupPC); 
+
+        if (bpb[lookupPC].valid
+            //&& inst_tag == bpb[lookupPC].tag
+            && bpb[lookupPC].tid == tid) {
+            DPRINTF(PreDecodeBTB, "BPB: hit bblAddr: 0x%llx branchPC: 0x%llx\n", instPC, bpb[lookupPC].branch.instAddr()); 
+            return lookupPC - instPC;
+        }
+        lookupPC += 4;
+    }
+    return 0;
 }
 
 TheISA::PCState
