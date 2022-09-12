@@ -1688,11 +1688,11 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
         blk_size_bits = comp_data->getSizeBits();
     }
 
-    if (pkt->req->isInstFetch()){
-        DPRINTFN("INST_FETCH\n");
-    }else{
-        DPRINTFN("DATA_FETCH\n");
-    }
+    //if (pkt->req->isInstFetch()){
+    //    DPRINTFN("INST_FETCH\n");
+    //}else{
+    //    DPRINTFN("DATA_FETCH\n");
+    //}
     // Find replacement victim
     std::vector<CacheBlk*> evict_blks;
     CacheBlk *victim = tags->findVictim(addr, is_secure, blk_size_bits,

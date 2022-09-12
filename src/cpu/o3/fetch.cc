@@ -71,6 +71,7 @@
 #include "sim/full_system.hh"
 #include "sim/system.hh"
 #include "debug/Bgodala.hh"
+#include "debug/PreDecode.hh"
 
 
 using namespace std;
@@ -85,7 +86,7 @@ namespace o3
 #define SETS 64 // 1MB / 64B / 256 = 64 <-- if change this number, need to change set mask (ind) too
 #define NUM_WAYS 8
 #define CACHE_LINE_SIZE 64 // line size in bytes
-#define CACHE_LISZE_SIZE_WIDTH 6 // number of bits
+#define CACHE_LINE_SIZE_WIDTH 6 // number of bits
 #define ICACHE_ACCESS_LATENCY 2 // in cycles
 #define INST_SIZE 4 // in bytes
 enum Repl {ORACLE, LRU, RANDOM, NONE};
@@ -427,6 +428,7 @@ Fetch::clearStates(ThreadID tid)
     prefetchQueueSeqNum[tid].clear();
     prefetchQueueBr[tid].clear();
     prefetchBufferPC[tid].clear();
+    prefetchBufferActualPC[tid].clear();
     lastProcessedLine = 0;
     lastAddrFetched = 0;
     // TODO not sure what to do with priorityList for now
@@ -478,6 +480,7 @@ Fetch::resetStage()
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
         prefetchBufferPC[tid].clear();
+        prefetchBufferActualPC[tid].clear();
 
         priorityList.push_back(tid);
     }
@@ -578,10 +581,10 @@ Fetch::processCacheCompletion(PacketPtr pkt)
     assert(req_it != fetchBufferReqPtr[tid].end() && "req_it cannot be end\n");
     DPRINTF(Fetch, "fetchBufferPC: %#x fetchBufferReqPtr: %#x memReq_it: %#x pkt->req: %#x\n",*pc_it, *req_it, *memReq_it, pkt->req);
     // cms11 edit
-    memrecv_ticks[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
-    memlevels[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = memHierarchLevel;
-    buffer_cache[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = true;
-    starve[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = fromDecode->decodeIdle[tid];
+    memrecv_ticks[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = curTick();
+    memlevels[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = memHierarchLevel;
+    buffer_cache[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = true;
+    starve[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = fromDecode->decodeIdle[tid];
 
     //Commenting this code since pc_it , buf_it and valid_it iterator is pointing
     //to the proper entry
@@ -623,7 +626,7 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             if (pkt->req->getAccessDepth()>0) {
                 //fetchL1MissStarve++;
                 //DPRINTFNR("T,%#x\n", (*memReq_it)->getVaddr());
-                missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='S';
+                missSt[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] ='S';
                 //fetchIcacheMissL1StDump++;
                 int numStarves = 0;
                 for(int i=0; i<8; i++) {
@@ -674,11 +677,11 @@ Fetch::processCacheCompletion(PacketPtr pkt)
         } else if(pkt->req->getAccessDepth()>0) {
             //fetchL1MissNoStarve++;
             //DPRINTFNR("F,%#x\n", (*memReq_it)->getVaddr());
-            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='N';
+            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] ='N';
             //fetchIcacheMissL1NoStDump++;
         } else {
             //DPRINTFNR("H,%#x\n", (*memReq_it)->getVaddr());
-            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] ='H';
+            missSt[tid][(pkt->req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] ='H';
         }
 
         decodeIdle[tid] = false;
@@ -691,11 +694,11 @@ Fetch::processCacheCompletion(PacketPtr pkt)
             //DPRINTF(Fetch,"Prefetch Queue size %d\n",prefetchQueue[tid].size());
         }
         
-        isPredictable[tid][(*memReq_it)->getVaddr() >> CACHE_LISZE_SIZE_WIDTH] = true;
+        isPredictable[tid][(*memReq_it)->getVaddr() >> CACHE_LINE_SIZE_WIDTH] = true;
         //Reset the resteerTarget
         if ((resteerTarget >> 6) == ((*memReq_it)->getVaddr() >> 6) &&
                 memReq_it == memReq[tid].begin()){
-            isPredictable[tid][resteerTarget >> CACHE_LISZE_SIZE_WIDTH] = false;
+            isPredictable[tid][resteerTarget >> CACHE_LINE_SIZE_WIDTH] = false;
             resteerTarget = 0;
         }
 
@@ -1132,6 +1135,7 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         lastAddrFetched = prefetchBufferPC[tid].front(); 
         //Flush everything except head
         prefetchBufferPC[tid].erase(++prefetchBufferPC[tid].begin(),prefetchBufferPC[tid].end());
+        prefetchBufferActualPC[tid].erase(++prefetchBufferActualPC[tid].begin(),prefetchBufferActualPC[tid].end());
         cleanupFetchBuffer(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBuffer[tid].erase(++fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBufferPC[tid].erase(++fetchBufferPC[tid].begin(), fetchBufferPC[tid].end());
@@ -1227,6 +1231,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
         prefetchBufferPC[tid].clear();
+        prefetchBufferActualPC[tid].clear();
         cleanupFetchBuffer(fetchBuffer[tid].begin(),fetchBuffer[tid].end());
         fetchBuffer[tid].clear();
         fetchBufferPC[tid].clear();
@@ -1236,6 +1241,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         fetchBufferValid[tid].push_front(false);
         fetchBuffer[tid].push_front(new uint8_t[fetchBufferSize]);
         prefetchBufferPC[tid].push_front(fetchBufferBlockPC);
+        prefetchBufferActualPC[tid].push_front(fetchBufferBlockPC);
         fetchBufferReqPtr[tid].push_front(mem_req);
     } else {
         fetchBufferPC[tid].push_back(fetchBufferBlockPC);
@@ -1350,7 +1356,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                     "response.\n", tid);
             lastIcacheStall[tid] = curTick();
             // cms11
-            memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
+            memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = curTick();
             if(add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1))
                 fetchStatus[tid] = IcacheWaitResponse;
             // Notify Fetch Request probe when a packet containing a fetch
@@ -1417,7 +1423,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                         "response.\n", tid);
                 lastIcacheStall[tid] = curTick();
                 // cms11
-                memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LISZE_SIZE_WIDTH] = curTick();
+                memsent_ticks[tid][(mem_req->getVaddr()) >> CACHE_LINE_SIZE_WIDTH] = curTick();
                 if(add_front  || (fetchBufferBlockPC==fetchBufferExpectedPC && fetchBufferPC[tid].size()==1))
                     fetchStatus[tid] = IcacheWaitResponse;
                 // Notify Fetch Request probe when a packet containing a fetch
@@ -1452,6 +1458,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             bufIt buf_it = fetchBuffer[tid].begin();
             reqIt req_it = fetchBufferReqPtr[tid].begin();
             pcIt pref_pc_it = prefetchBufferPC[tid].begin();
+            pcIt pref_actual_pc_it = prefetchBufferActualPC[tid].begin();
 
             while(req_it != fetchBufferReqPtr[tid].end()){
 
@@ -1465,6 +1472,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                      fetchBufferReqPtr[tid].erase(req_it, fetchBufferReqPtr[tid].end());
                      //empty prefetchBufferPC so that the request is not sent again
                      prefetchBufferPC[tid].erase(pref_pc_it,prefetchBufferPC[tid].end());
+                     prefetchBufferActualPC[tid].erase(pref_actual_pc_it,prefetchBufferActualPC[tid].end());
                      memReqListIt memReq_it = std::find(memReq[tid].begin(),memReq[tid].end(), mem_req);
                      assert(memReq_it != memReq[tid].end() && "This element should exist in the memReq[tid] list");
                      memReq[tid].erase(memReq_it, memReq[tid].end());
@@ -1475,6 +1483,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
                 val_it++;
                 req_it++;
                 pref_pc_it++;
+                pref_actual_pc_it++;
             }
 
             //Stop prefetching
@@ -1598,6 +1607,7 @@ Fetch::doSquash(const TheISA::PCState &newPC, const DynInstPtr squashInst,
         prefetchQueueSeqNum[tid].clear();
         prefetchQueueBr[tid].clear();
         prefetchBufferPC[tid].clear();
+        prefetchBufferActualPC[tid].clear();
         DPRINTF(Fetch, "[tid:%i] Squashing, prefetch Queue to size: %d.\n",
             tid, prefetchQueue[tid].size());
     //}
@@ -2487,6 +2497,188 @@ Fetch::preDecode(){
     }
 }
 
+//Pre decode last line that is pre-fetched
+void
+Fetch::preDecodeAllLines(){
+    ThreadID tid = 0;
+    TheISA::PCState bblPC = lastPrefPC;
+
+    preDecoder[tid]->reset();
+
+    // Avoid pre-decoding the same line again
+    //if ( lastProcessedLine == lastAddrFetched ){
+    //    return;
+    //}
+
+    //if (branchPred->getBblValid(thisPC.instAddr(), tid))
+    //    return; 
+    //Check if the buffer has valid last entry
+    //If the line is same as the prefPC line then predcode it and update
+    //BTB
+
+    assert(fetchBufferValid[tid].size() == fetchBufferPC[tid].size() && "Check fetchBufferValid and fetchBufferPC sizes");
+    assert(fetchBufferPC[tid].size() == fetchBuffer[tid].size() && "Check fetchBufferPC and fetchBuffer sizes");
+
+    pcIt pc_it = fetchBufferPC[tid].begin();
+    pcIt actual_pc_it = prefetchBufferActualPC[tid].begin();
+    auto fetch_buf_valid_it = fetchBufferValid[tid].begin();
+    auto fetch_buf_it = fetchBuffer[tid].begin();
+
+    for (; fetch_buf_valid_it != fetchBufferValid[tid].end(); pc_it++, actual_pc_it++, fetch_buf_valid_it++,fetch_buf_it++){
+
+        // If fetch buffer is not valid then skip this entry and go to next one
+        if (!(*fetch_buf_valid_it)){
+            continue;
+        }
+
+        if(*pc_it == *actual_pc_it){
+            DPRINTFN("SKIP: 0x%llx\n", *pc_it);
+            continue;
+        }
+
+        // Skip if the cache lines are different
+        // TODO: Fix this case later
+        // Ideally such a case should not happen
+        if((*pc_it >> CACHE_LINE_SIZE_WIDTH) != (*actual_pc_it >> CACHE_LINE_SIZE_WIDTH)){
+            DPRINTFN("SKIP: 0x%llx\n", *pc_it);
+            continue;
+        }
+
+        DPRINTFN("pc_it: 0x%llx actual PC: 0x%llx\n", *pc_it, *actual_pc_it);
+        TheISA::PCState thisPC = lastPrefPC;
+
+        thisPC.pc(*pc_it);
+        thisPC.npc(*pc_it + 4);
+
+        thisPC.upc(0);
+        thisPC.nupc(1);
+
+        bblPC = thisPC;
+
+        Addr fetchAddr = thisPC.instAddr() & decoder[tid]->pcMask();
+        Addr fetchBufferBlockPC = fetchBufferAlignPC(fetchAddr);
+
+        //bool inRom = isRomMicroPC(thisPC.microPC());
+        bool inRom = false;
+        StaticInstPtr curMacroop = NULL; 
+        StaticInstPtr staticInst = NULL; 
+        TheISA::PCState nextPC = thisPC;;
+        int pcOffset = 0;
+
+        unsigned blkOffset = 0; 
+        Addr lastAddr = *actual_pc_it; 
+        auto *dec_ptr = preDecoder[tid];
+
+        assert(blkOffset <= 16 && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
+        DPRINTF(Fetch, "fetchBufferValid Size: %d fetchBufferPC Size: %d fetchBuffer Size: %d\n",fetchBufferValid[tid].size(),fetchBufferPC[tid].size(),fetchBuffer[tid].size());
+
+        while(fetchAddr < lastAddr){
+            unsigned dec_data = 0;
+            assert(blkOffset <= 16 && "blkOffset cannot be grater than CACHE_LINZE_SIZE\n");
+            DPRINTF(Fetch, "predecoder: fetchAddr is %#x fetchBufferBlockPC: %#x lastPrefPC[0]: %#x blkOffset: %d\n", fetchAddr, fetchBufferBlockPC, lastPrefPC.instAddr(), blkOffset);
+            memcpy(&dec_data,
+                    (*fetch_buf_it) + blkOffset * instSize, instSize);
+            DPRINTF(Fetch, "predecoder: fetchAddr is %#x fetchBufferBlockPC: %#x lastPrefPC[0]: %#x blkOffset: %d Data: %#x\n", fetchAddr, fetchBufferBlockPC, lastPrefPC.instAddr(), blkOffset, dec_data);
+            bool needMem = !inRom && !curMacroop && !dec_ptr->instReady();
+            fetchAddr = (thisPC.instAddr() + pcOffset) & dec_ptr->pcMask();
+            
+            //assert(fetchAddr == fetchBufferPC[tid].back() + blkOffset * instSize && "Predcode address mismatch\n");
+
+            if(needMem){
+                memcpy(dec_ptr->moreBytesPtr(),
+                        (*fetch_buf_it) + blkOffset * instSize, instSize);
+                preDecoder[tid]->moreBytes(thisPC, fetchAddr);
+
+                if (dec_ptr->needMoreBytes()) {
+                    blkOffset++;
+                    fetchAddr += instSize;
+                    pcOffset += instSize;
+                }
+            }
+        
+            do {
+                DPRINTF(Fetch,"PREDECODER: thisPC: %s\n",thisPC);
+                if (!(curMacroop || inRom)) {
+                    if (dec_ptr->instReady()) {
+                        staticInst = dec_ptr->decode(thisPC);
+
+                        if (staticInst->isMacroop()) {
+                            curMacroop = staticInst;
+                        } else {
+                        }
+                    } else {
+                        // We need more bytes for this instruction so blkOffset and
+                        // pcOffset will be updated
+                        break;
+                    }
+                }
+                // Whether we're moving to a new macroop because we're at the
+                // end of the current one, or the branch predictor incorrectly
+                // thinks we are...
+                bool newMacro = false;
+                if (curMacroop || inRom) {
+                    if (inRom) {
+                        staticInst = dec_ptr->fetchRomMicroop(
+                                thisPC.microPC(), curMacroop);
+                    } else {
+                        staticInst = curMacroop->fetchMicroop(thisPC.microPC());
+                    }
+                    newMacro |= staticInst->isLastMicroop();
+                }
+                nextPC = thisPC;
+                staticInst->advancePC(nextPC);
+                newMacro |= thisPC.instAddr() != nextPC.instAddr();
+                inRom = isRomMicroPC(thisPC.microPC());
+
+                if (staticInst->isDirectCtrl()) {
+                    DPRINTF(PreDecode, "PREDECODE BBLInsert Inserting Direct ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
+                            bblPC.instAddr(), thisPC.instAddr(), staticInst->branchTarget(thisPC), thisPC.instAddr() - bblPC.instAddr());
+                    //branchPred->BTBUpdate(bblPC.instAddr(),
+                    //                      staticInst,
+                    //                      thisPC,
+                    //                      thisPC.instAddr() - bblPC.instAddr(),
+                    //                      staticInst->branchTarget(thisPC),
+                    //                      nextPC,
+                    //                      staticInst->isUncondCtrl(),
+                    //                      tid);
+                    //assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
+                    bblPC = nextPC;
+                } else if(staticInst->isControl()){
+                    TheISA::PCState dummyBranchTarget = nextPC;
+                    //dummyBranchTarget.pc(-1);
+                    //dummyBranchTarget.npc(-1);
+
+                    DPRINTF(PreDecode, "PREDECODE BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
+                            bblPC.instAddr(), thisPC.instAddr(), dummyBranchTarget, thisPC.instAddr() - bblPC.instAddr());
+                    //branchPred->BTBUpdate(bblPC.instAddr(),
+                    //                      staticInst,
+                    //                      thisPC,
+                    //                      thisPC.instAddr() - bblPC.instAddr(),
+                    //                      dummyBranchTarget,
+                    //                      nextPC,
+                    //                      staticInst->isUncondCtrl(),
+                    //                      tid);
+                    //assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
+                    bblPC = nextPC;
+                }
+
+                //Move to next instruction
+                thisPC = nextPC;
+                if (newMacro) {
+                    fetchAddr = thisPC.instAddr() & dec_ptr->pcMask(); 
+                    //blkOffset = (fetchAddr - fetchBufferPC[tid]) / instSize;
+                    blkOffset = (fetchAddr - *pc_it) / instSize;
+                    curMacroop = NULL;
+                    pcOffset = 0;
+                }
+
+
+            } while(curMacroop || dec_ptr->instReady());
+        }
+
+    }
+}
+
 void
 Fetch::addToFTQ()
 {
@@ -2515,6 +2707,7 @@ Fetch::addToFTQ()
         return;
     }
     //assert(prefPC[tid].instAddr() != 0 && "prefPC cannot be 0\n");
+    preDecodeAllLines();
     //preDecode();
     // The current Prefetch PC.
     TheISA::PCState thisPC = prefPC[tid];
@@ -2536,9 +2729,14 @@ Fetch::addToFTQ()
         }
 
         if (nextPC.instAddr()>0x10) {
+
+            //if ((nextPC.instAddr() & 0x3f) != 0){
+            //    DPRINTFN("Jumping to the middle of a line 0x%llx\n", nextPC.instAddr());
+            //}
             TheISA::PCState prevPrefPC = prefPC[tid];;
             lastPrefPC = prefPC[tid];
             prefPC[tid] = nextPC;
+            Addr actualPC = nextPC.instAddr();
             // Add to the prefetch queue
             if (branchPC.instAddr() < thisPC.instAddr()){
                 DPRINTF(Fetch, "should not happen branchPC: %s thisPC: %s\n", branchPC, thisPC);
@@ -2576,8 +2774,8 @@ Fetch::addToFTQ()
             DPRINTF(Fetch, "[tid:%i] Prefetch queue entry created (%i/%i) %s %s.\n",
                     tid, prefetchQueue[tid].size(), prefetchQueueSize, prefetchQueue[tid].front(), nextPC);
 
-            Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
-            Addr branchPCLine = (branchPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+            Addr curPCLine = (thisPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
+            Addr branchPCLine = (branchPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
 
             curPCLine  &= decoder[tid]->pcMask();
             branchPCLine &= decoder[tid]->pcMask();
@@ -2607,11 +2805,13 @@ Fetch::addToFTQ()
                                 if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
                                     DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                     prefetchBufferPC[tid].push_back(curPCLine);
+                                    prefetchBufferActualPC[tid].push_back(actualPC);
                                     lastAddrFetched = curPCLine;
                                 }else if(prefetchBufferPC[tid].empty()){
                                     if(curPCLine != lastAddrFetched){
                                         DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                         prefetchBufferPC[tid].push_back(curPCLine);
+                                        prefetchBufferActualPC[tid].push_back(actualPC);
                                         lastAddrFetched = curPCLine;
                                     }
                                 }
@@ -2621,6 +2821,7 @@ Fetch::addToFTQ()
                             //if(curPCLine > branchPCLine){
                             //  break;
                             //}
+                            actualPC = curPCLine;
                         }while(curPCLine <= branchPCLine);
                         DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
                     }else{
@@ -2634,11 +2835,13 @@ Fetch::addToFTQ()
                                 if(!prefetchBufferPC[tid].empty() && curPCLine != prefetchBufferPC[tid].back()){
                                     DPRINTF(Fetch, "Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                     prefetchBufferPC[tid].push_back(curPCLine);
+                                    prefetchBufferActualPC[tid].push_back(actualPC);
                                     lastAddrFetched = curPCLine;
                                 }else if(prefetchBufferPC[tid].empty()){
                                     if(curPCLine != lastAddrFetched){
                                         DPRINTF(Fetch, "EMPTY Pushing curPCLine:%#x and branchPCLine:%#x\n",curPCLine, branchPCLine);
                                         prefetchBufferPC[tid].push_back(curPCLine);
+                                        prefetchBufferActualPC[tid].push_back(actualPC);
                                         lastAddrFetched = curPCLine;
                                     }
                                 }
@@ -2648,6 +2851,7 @@ Fetch::addToFTQ()
                             //if(curPCLine > branchPCLine){
                             //  break;
                             //}
+                            actualPC = curPCLine;
                         }while(curPCLine <= branchPCLine);
                         DPRINTF(Fetch, "curPCLine %#x and branchPCLine %#x\n",curPCLine, branchPCLine);
                     }else{
@@ -2713,6 +2917,10 @@ Fetch::addToFTQ()
             prefetchBufferPC[tid].push_back(prefetchPCLine);
             prefetchBufferPC[tid].push_back(prefetchPCLine + CACHE_LINE_SIZE);
 
+            //Also update actual PC to avoid any size mismatch issues
+            prefetchBufferActualPC[tid].push_back(prefetchPCLine);
+            prefetchBufferActualPC[tid].push_back(prefetchPCLine + CACHE_LINE_SIZE);
+
             lastAddrFetched = prefetchPCLine + CACHE_LINE_SIZE;
 
             //Stop prefetching till new branch is found
@@ -2736,17 +2944,17 @@ Fetch::addToFTQ()
                 // if flag is set then use lastAddrFetched else prefPC
                 Addr curPCLine = 0; 
                 if(fallThroughPrefPC == prefPC[tid].instAddr()){
-                    curPCLine = (lastAddrFetched>> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+                    curPCLine = (lastAddrFetched>> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
                     curPCLine += CACHE_LINE_SIZE;
                 }else{
                     fallThroughPrefPC = prefPC[tid].instAddr();
-                    curPCLine = (prefPC[tid].instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+                    curPCLine = (prefPC[tid].instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
                     if(prefetchBufferPC[tid].empty() && curPCLine == lastAddrFetched && fetchBufferBlockPC == lastAddrFetched){
                         curPCLine += CACHE_LINE_SIZE;
                         DPRINTF(Fetch, "Go to next line if first line is already fetched and prefetchBuffer is empty\n");
                     }
                     //if(lastAddrFetched == prefPC[tid].instAddr()){
-                    //    curPCLine += CACHE_LINE_SIZE;
+                    //    curPCLine +NCACHE_LINE_SIZE;
                     //    DPRINTF(Fetch, "Already fetched prefPC %#x so fetching next line %#x\n",prefPC[tid].instAddr(),curPCLine);
                     //}
                     lastPrefPC = prefPC[tid];
@@ -2755,7 +2963,7 @@ Fetch::addToFTQ()
                     //lastProcessedLine = 0;
                 }
                 Addr branchPCLine = curPCLine; 
-                //Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+                //Addr curPCLine = (thisPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
                 //Addr branchPCLine = curPCLine; 
 
                 curPCLine  &= decoder[tid]->pcMask();
@@ -2791,7 +2999,7 @@ Fetch::addToFTQ()
     //    DPRINTF(Fetch,"addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
     //    //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
     //    TheISA::PCState thisPC = pc[tid];
-    //    Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+    //    Addr curPCLine = (thisPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
     //    prefetchBufferPC[tid].push_back(curPCLine);
     //    lastAddrFetched = curPCLine;
     //    //lastPrefPC = thisPC;
@@ -3211,13 +3419,13 @@ Fetch::fetch(bool &status_change)
                 instruction->mispred = 'F';
                 instruction->squashedFromThisInst = false;
                 // cms11 edit
-                instruction->memsentTick = memsent_ticks[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->memrecvTick = memrecv_ticks[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->memlevel = memlevels[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->buf = buffer_cache[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->starve = starve[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->missSt = missSt[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
-                instruction->isPredictable = isPredictable[tid][(thisPC.instAddr()) >> CACHE_LISZE_SIZE_WIDTH];
+                instruction->memsentTick = memsent_ticks[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->memrecvTick = memrecv_ticks[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->memlevel = memlevels[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->buf = buffer_cache[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->starve = starve[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->missSt = missSt[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
+                instruction->isPredictable = isPredictable[tid][(thisPC.instAddr()) >> CACHE_LINE_SIZE_WIDTH];
                 
                 //erase from map after assigning
                 //memsent_ticks[tid].erase((thisPC.instAddr()));
@@ -3318,6 +3526,7 @@ Fetch::fetch(bool &status_change)
         fetchBufferReqPtr[tid].pop_front();
         if(prefetchBufferPC[tid].size()>0){
           prefetchBufferPC[tid].pop_front();
+          prefetchBufferActualPC[tid].pop_front();
         }
         DPRINTF(Fetch, "[tid:%i] Popping queue %d %d %d.\n", tid, fetchBuffer[tid].size(), fetchBufferPC[tid].size(), fetchBufferValid[tid].size());
         if(prefetchBufferPC[tid].size()>0 && fetchBufferBlockPC != prefetchBufferPC[tid].front() && !curMacroop){
@@ -3343,6 +3552,7 @@ Fetch::fetch(bool &status_change)
             //prefetchQueueBr[tid].clear();
 
             prefetchBufferPC[tid].clear();
+            prefetchBufferActualPC[tid].clear();
             cleanupFetchBuffer(fetchBuffer[tid].begin() ,fetchBuffer[tid].end());
             fetchBuffer[tid].clear();
             fetchBufferPC[tid].clear();
@@ -3562,7 +3772,7 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
     
     if(!prefetchBufferPC[tid].empty()){
         TheISA::PCState thisPC = pc[tid];
-        Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+        Addr curPCLine = (thisPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
         curPCLine &= decoder[tid]->pcMask(); 
         if(curPCLine != prefetchBufferPC[tid].front()){
             warn("BUG! fetch at %#x and prefetchBuffer at %#x tick: %llu\n",thisPC.instAddr(), prefetchBufferPC[tid].front(), curTick());
@@ -3576,9 +3786,10 @@ Fetch::pipelineIcacheAccesses(ThreadID tid)
         DPRINTF(Fetch,"pipelineIcache addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         //DPRINTFN("addToFTQ pc[tid] is %#x\n", pc[tid].instAddr());
         TheISA::PCState thisPC = pc[tid];
-        Addr curPCLine = (thisPC.instAddr() >> CACHE_LISZE_SIZE_WIDTH) << CACHE_LISZE_SIZE_WIDTH;
+        Addr curPCLine = (thisPC.instAddr() >> CACHE_LINE_SIZE_WIDTH) << CACHE_LINE_SIZE_WIDTH;
         curPCLine &= decoder[tid]->pcMask(); 
         prefetchBufferPC[tid].push_back(curPCLine);
+        prefetchBufferActualPC[tid].push_back(thisPC.instAddr());
         lastAddrFetched = curPCLine;
         //lastPrefPC = thisPC;
         //prefPC[tid] = thisPC;

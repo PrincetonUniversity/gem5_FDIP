@@ -359,6 +359,7 @@ class Fetch
     bool checkSignalsAndUpdate(ThreadID tid);
 
     TheISA::PCState predictNextBasicBlock(TheISA::PCState prefetchPC, TheISA::PCState &branchPC, ThreadID tid, bool &stopPrefetch, bool &instLimitReached);
+    void preDecodeAllLines();
     void preDecode();
     void addToFTQ();
     template<typename IterType> void cleanupFetchBuffer(IterType it, IterType end);
@@ -528,6 +529,7 @@ class Fetch
     //Addr fetchBufferPC[MaxThreads];
     std::list<Addr> fetchBufferPC[MaxThreads];
     std::list<Addr> prefetchBufferPC[MaxThreads];
+    std::list<Addr> prefetchBufferActualPC[MaxThreads];
     std::list<RequestPtr> fetchBufferReqPtr[MaxThreads];
     bool add_front;
 
