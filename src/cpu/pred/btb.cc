@@ -136,6 +136,7 @@ bool
 DefaultBTB::validBPB(Addr instPC, ThreadID tid)
 {
     Addr inst_tag = getTag(instPC);
+    unsigned btb_idx = getIndex(instPC, tid);
 
     Addr lookupPC = instPC;
 
@@ -143,6 +144,11 @@ DefaultBTB::validBPB(Addr instPC, ThreadID tid)
         if (bpb[lookupPC].valid
     //        && inst_tag == bpb[lookupPC].tag
             && bpb[lookupPC].tid == tid) {
+
+            //Update BTB entry so that lookups can be avoided
+            btb[btb_idx] = bpb[lookupPC];
+            btb[btb_idx].bblSize = lookupPC - instPC;
+            btb[btb_idx].tag = inst_tag; 
             return true;
         }
         lookupPC += 4;
