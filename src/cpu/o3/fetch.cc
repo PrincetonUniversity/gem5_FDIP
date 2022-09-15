@@ -1001,6 +1001,11 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
             prefetchQueueBr[tid].clear();
             //prefetchBufferPC[tid].clear();
             tempPC = nextPC;
+            
+            //Hack to set upc and nupc
+            tempPC.upc(0);
+            tempPC.nupc(1);
+
             predict_taken = branchPred->predict(inst->staticInst, seq[tid],
                                       bblAddr[tid], tempPC, tid);
             brseq[tid] = seq[tid];
@@ -1033,6 +1038,11 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
     } else {
         DPRINTF(Fetch, "Nayana lookupAndupdate\n");
         tempPC = nextPC;
+
+        //Hack to set upc and nupc
+        tempPC.upc(0);
+        tempPC.nupc(1);
+
 	    DPRINTF(Fetch, "Bgodala tempPC is %#x\n", tempPC.instAddr());
         predict_taken = branchPred->predict(inst->staticInst, seq[tid],
                                       bblAddr[tid], tempPC, tid);
@@ -2504,8 +2514,6 @@ Fetch::preDecodeAllLines(){
     ThreadID tid = 0;
     TheISA::PCState bblPC = lastPrefPC;
 
-    preDecoder[tid]->reset();
-
     // Avoid pre-decoding the same line again
     //if ( lastProcessedLine == lastAddrFetched ){
     //    return;
@@ -2546,6 +2554,8 @@ Fetch::preDecodeAllLines(){
         }
 
         DPRINTF(PreDecode, "pc_it: 0x%llx actual PC: 0x%llx\n", *pc_it, *actual_pc_it);
+
+        preDecoder[tid]->reset();
         TheISA::PCState thisPC = lastPrefPC;
 
         thisPC.pc(*pc_it);
@@ -2631,7 +2641,7 @@ Fetch::preDecodeAllLines(){
                 newMacro |= thisPC.instAddr() != nextPC.instAddr();
                 inRom = isRomMicroPC(thisPC.microPC());
 
-                if (staticInst->isDirectCtrl()) {
+                if (staticInst->isDirectCtrl() && staticInst->isUncondCtrl() && !staticInst->isMicroop()) {
                     DPRINTF(PreDecode, "PREDECODE BBLInsert Inserting Direct ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
                             bblPC.instAddr(), thisPC.instAddr(), staticInst->branchTarget(thisPC), thisPC.instAddr() - bblPC.instAddr());
                     if(enableBPB){
@@ -2644,23 +2654,6 @@ Fetch::preDecodeAllLines(){
                                               staticInst->isUncondCtrl(),
                                               tid);
                     }
-                    //assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
-                    bblPC = nextPC;
-                } else if(staticInst->isControl()){
-                    TheISA::PCState dummyBranchTarget = nextPC;
-                    //dummyBranchTarget.pc(-1);
-                    //dummyBranchTarget.npc(-1);
-
-                    DPRINTF(PreDecode, "PREDECODE BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d\n",
-                            bblPC.instAddr(), thisPC.instAddr(), dummyBranchTarget, thisPC.instAddr() - bblPC.instAddr());
-                    //branchPred->BTBUpdate(bblPC.instAddr(),
-                    //                      staticInst,
-                    //                      thisPC,
-                    //                      thisPC.instAddr() - bblPC.instAddr(),
-                    //                      dummyBranchTarget,
-                    //                      nextPC,
-                    //                      staticInst->isUncondCtrl(),
-                    //                      tid);
                     //assert(thisPC.instAddr() >= bblPC.instAddr()  && "bblSize must be greater than 0");
                     bblPC = nextPC;
                 }
@@ -3238,6 +3231,7 @@ Fetch::fetch(bool &status_change)
                 } else {
                     staticInst = curMacroop->fetchMicroop(thisPC.microPC());
                 }
+                assert(staticInst && "StaticInst cannot be null\n");
                 newMacro |= staticInst->isLastMicroop();
             }
 

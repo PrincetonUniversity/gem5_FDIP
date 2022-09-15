@@ -453,6 +453,9 @@ DefaultBTB::updateBPB(Addr instPC, const StaticInstPtr &staticBranchInst,
                    const uint64_t bblSize, const TheISA::PCState &target, 
                    const TheISA::PCState &ft, bool uncond, ThreadID tid)
 {
+    if(!staticBranchInst)
+        return;
+
     Addr bpb_idx = instPC; 
     
     //    DPRINTF(PreDecodeBTB, "BTB update bpb_index: 0x%llx staticBrancInst 0x%lx target %s branchPC: %s\n", 

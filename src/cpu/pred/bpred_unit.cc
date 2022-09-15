@@ -490,6 +490,8 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                     TheISA::PCState indirectBrTarget = pc;
                     indirectBrTarget.pc(target.pc());
                     indirectBrTarget.npc(target.npc());
+                    indirectBrTarget.upc(0);
+                    indirectBrTarget.nupc(1);
                     target = indirectBrTarget;
                     DPRINTF(Branch,
                             "[tid:%i] [sn:%llu] "
