@@ -57,8 +57,9 @@ class Base : public SimObject
 {
   public:
     bool inst_only;
+    bool clip;
     typedef BaseReplacementPolicyParams Params;
-    Base(const Params &p) : SimObject(p), inst_only(p.inst_only) {}
+    Base(const Params &p) : SimObject(p), inst_only(p.inst_only), clip(p.clip) {}
     virtual ~Base() = default;
 
     /**
@@ -78,10 +79,15 @@ class Base : public SimObject
     virtual void touch(const std::shared_ptr<ReplacementData>&
         replacement_data, const PacketPtr pkt)
     {
-        touch(replacement_data);
+         touch_inst_line(replacement_data, pkt->req->isInstFetch(), pkt->isSFL());
     }
     virtual void touch(const std::shared_ptr<ReplacementData>&
         replacement_data) const = 0;
+
+    virtual void touch_inst_line(const std::shared_ptr<ReplacementData>&
+        replacement_data, bool is_inst, bool is_sfl) const {
+        touch(replacement_data);
+    }
 
     /**
      * Reset replacement data. Used when it's holder is inserted/validated.
@@ -92,11 +98,7 @@ class Base : public SimObject
     virtual void reset(const std::shared_ptr<ReplacementData>&
         replacement_data, const PacketPtr pkt)
     {
-        if(inst_only){
-             reset_inst_line(replacement_data, pkt->req->isInstFetch());
-        }else{
-            reset(replacement_data);
-        }
+         reset_inst_line(replacement_data, pkt->req->isInstFetch(), pkt->isSFL());
     }
 
     virtual void reset(const std::shared_ptr<ReplacementData>&
@@ -106,9 +108,9 @@ class Base : public SimObject
                                                 replacement_data) const { return; };
 
     virtual void reset_inst_line(const std::shared_ptr<ReplacementData>&
-        replacement_data, bool is_inst) const
+        replacement_data, bool is_inst, bool is_sfl) const
     {
-        return;
+        reset(replacement_data);
     }
     /**
      * Find replacement victim among candidates.

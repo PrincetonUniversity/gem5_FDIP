@@ -387,6 +387,7 @@ class Packet : public Printable
     bool _isStarved;
     bool _isPreserve;
     bool _isSBIP;
+    bool _isSFL;
     // EMISSARY: END
 
     /// The size of the request or transfer.
@@ -843,6 +844,15 @@ class Packet : public Printable
     }
     //EMISSARY: END
 
+    //SFL: BEGIN
+    bool isSFL() const
+    {
+        assert(flags.isSet(VALID_ADDR));
+        return _isSFL;
+    }
+
+    //SFL: END
+
     /**
      * Accessor function to atomic op.
      */
@@ -1118,6 +1128,13 @@ class Packet : public Printable
         this->_isPreserve = isPreserve;
     }
     //EMISSARY: END
+
+    void
+    setSFL(bool isSFL)
+    {
+        this->_isSFL = isSFL;
+    }
+
 
     /**
      * Check if packet corresponds to a given block-aligned address and

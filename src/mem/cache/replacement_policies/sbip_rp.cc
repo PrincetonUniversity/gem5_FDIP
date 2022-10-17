@@ -58,13 +58,13 @@ SBIP::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 }
 
 void
-SBIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst) const
+SBIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst, bool is_sfl) const
 {
     std::shared_ptr<LRUReplData> casted_replacement_data =
         std::static_pointer_cast<LRUReplData>(replacement_data);
 
     DPRINTFN("SBIP INST_ONLY is inst %d\n",is_inst);
-    if(!is_inst){
+    if(inst_only && !is_inst){
         casted_replacement_data->lastTouchTick = curTick();
         return; 
     }

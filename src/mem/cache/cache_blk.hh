@@ -91,11 +91,12 @@ class CacheBlk : public TaggedEntry
         BlkStarved =        0x10,
         BlkPreserve =       0x200,
         BlkUsed =           0x400,
+        SFLBit =            0x800,
         /**
          * Helper enum value that includes all other bits. Whenever a new
          * bits is added, this should be updated.
          */
-        AllBits  =          0x61E,
+        AllBits  =          0xE1E,
     };
 
     /**
@@ -306,6 +307,19 @@ class CacheBlk : public TaggedEntry
     void clearPreserve()
     {
         clearCoherenceBits(BlkPreserve);
+    }
+    //EMISSARY: END
+
+    //SFL
+    bool isSFL() const
+    {
+        //return (status & BlkPreserve) != 0;
+        return (coherence & SFLBit) != 0;
+    }
+
+    void clearSFL()
+    {
+        clearCoherenceBits(SFLBit);
     }
     //EMISSARY: END
 

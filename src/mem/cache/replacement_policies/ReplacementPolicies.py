@@ -34,6 +34,8 @@ class BaseReplacementPolicy(SimObject):
     cxx_class = 'gem5::replacement_policy::Base'
     cxx_header = "mem/cache/replacement_policies/base.hh"
     inst_only = Param.Bool(False, "Enable Inst ONLY for L2 Policy")
+    clip = Param.Bool(False,
+        "Enable preserving code lines at l2(CLIP)")
 
 class DuelingRP(BaseReplacementPolicy):
     type = 'DuelingRP'
@@ -123,9 +125,18 @@ class BRRIPRP(BaseReplacementPolicy):
         "Prioritize evicting blocks that havent had a hit recently")
     btp = Param.Percent(3,
         "Percentage of blocks to be inserted with long RRPV")
+    enable_sfl = Param.Bool(False,
+        "Enable SFL bit feature in LLC")
 
 class RRIPRP(BRRIPRP):
     btp = 100
+
+class CLIPRP(BRRIPRP):
+    clip  = True
+    inst_only = True
+
+class SFLRP(BRRIPRP):
+    enable_sfl  = True
 
 class DRRIPRP(DuelingRP):
     # The constituency_size and the team_size must be manually provided, where:

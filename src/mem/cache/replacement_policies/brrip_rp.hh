@@ -112,6 +112,7 @@ class BRRIP : public Base
      */
     const unsigned btp;
 
+    const bool enable_sfl;
   public:
     typedef BRRIPRPParams Params;
     BRRIP(const Params &p);
@@ -134,6 +135,7 @@ class BRRIP : public Base
     void touch(const std::shared_ptr<ReplacementData>& replacement_data) const
                                                                      override;
 
+    void touch_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst, bool is_sfl) const override;
     /**
      * Reset replacement data. Used when an entry is inserted.
      * Set RRPV according to the insertion policy used.
@@ -143,6 +145,7 @@ class BRRIP : public Base
     void reset(const std::shared_ptr<ReplacementData>& replacement_data) const
                                                                      override;
 
+    void reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst, bool is_sfl) const override;
     /**
      * Find replacement victim using rrpv.
      *

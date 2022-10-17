@@ -44,7 +44,7 @@ namespace replacement_policy
 
 BRRIP::BRRIP(const Params &p)
   : Base(p), numRRPVBits(p.num_bits), hitPriority(p.hit_priority),
-    btp(p.btp)
+    btp(p.btp), enable_sfl(p.enable_sfl)
 {
     fatal_if(numRRPVBits <= 0, "There should be at least one bit per RRPV.\n");
 }
@@ -76,6 +76,31 @@ BRRIP::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
 }
 
 void
+BRRIP::touch_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst, bool is_sfl) const
+{
+    std::shared_ptr<BRRIPReplData> casted_replacement_data =
+        std::static_pointer_cast<BRRIPReplData>(replacement_data);
+
+    // If CLIP: then reset the rrpv to 0 for instruction lines
+    // and do not change rrpv bits of any other lines
+    if(clip){
+        if(is_inst){
+            casted_replacement_data->rrpv.reset();
+        }
+        return;
+    }
+    touch(replacement_data);
+    //// Update RRPV if not 0 yet
+    //// Every hit in HP mode makes the entry the last to be evicted, while
+    //// in FP mode a hit makes the entry less likely to be evicted
+    //if (hitPriority) {
+    //    casted_replacement_data->rrpv.reset();
+    //} else {
+    //    casted_replacement_data->rrpv--;
+    //}
+}
+
+void
 BRRIP::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
     std::shared_ptr<BRRIPReplData> casted_replacement_data =
@@ -85,6 +110,35 @@ BRRIP::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
     // Replacement data is inserted as "long re-reference" if lower than btp,
     // "distant re-reference" otherwise
     casted_replacement_data->rrpv.saturate();
+    if (random_mt.random<unsigned>(1, 100) <= btp) {
+        casted_replacement_data->rrpv--;
+    }
+
+    // Mark entry as ready to be used
+    casted_replacement_data->valid = true;
+}
+
+void
+BRRIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data, bool is_inst, bool is_sfl) const
+{
+    std::shared_ptr<BRRIPReplData> casted_replacement_data =
+        std::static_pointer_cast<BRRIPReplData>(replacement_data);
+
+    casted_replacement_data->rrpv.saturate();
+    if(clip){
+        if(is_inst){
+            casted_replacement_data->rrpv--;
+        }
+        return;
+    }
+    if(enable_sfl && is_sfl){
+        //DPRINTFN("SFL promotion\n");
+        casted_replacement_data->rrpv.reset();
+        return;
+    }
+    // Reset RRPV
+    // Replacement data is inserted as "long re-reference" if lower than btp,
+    // "distant re-reference" otherwise
     if (random_mt.random<unsigned>(1, 100) <= btp) {
         casted_replacement_data->rrpv--;
     }

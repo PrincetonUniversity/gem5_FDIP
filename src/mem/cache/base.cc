@@ -612,6 +612,12 @@ BaseCache::recvTimingResp(PacketPtr pkt)
         blk->starveCount = pkt->starveCount; 
     }
 
+    //When a reponse is served from L3 then set SFL bit
+    if(blk && pkt->req->getAccessDepth() == 2){
+        DPRINTF(Cache, "Access depth is %d\n",pkt->req->getAccessDepth());
+        blk->setCoherenceBits(CacheBlk::SFLBit);
+    }
+
     serviceMSHRTargets(mshr, pkt, blk);
 
     //EMISSARY: BEGIN
@@ -1774,6 +1780,7 @@ BaseCache::writebackBlk(CacheBlk *blk)
         new Packet(req, blk->isSet(CacheBlk::DirtyBit) ?
                    MemCmd::WritebackDirty : MemCmd::WritebackClean);
 
+    pkt->setSFL(blk->isSFL());
     //EMISSARY: BEGIN
     if( isReadOnly ){
         pkt->evictFromL1 = true;

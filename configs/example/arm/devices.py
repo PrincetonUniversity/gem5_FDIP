@@ -323,6 +323,12 @@ class CpuCluster(SubSystem):
         elif self._l2_rp == "BIP":
             self.l2.replacement_policy = BIPRP()
             self.l2.replacement_policy.btp = 3 # self.btp
+        elif self._l2_rp == "BRRIP":
+            self.l2.replacement_policy = BRRIPRP()
+            self.l2.replacement_policy.btp = 3 # self.btp
+        elif self._l2_rp == "CLIP":
+            self.l2.replacement_policy = CLIPRP()
+            self.l2.replacement_policy.btp = 3 # self.btp
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size
@@ -553,6 +559,12 @@ class BaseSimpleSystem(ArmSystem):
             self.toL3Bus.mem_side_ports = self.l3.cpu_side
             self.l3.mem_side = self.membus.cpu_side_ports
             cluster_mem_bus = self.toL3Bus
+
+            if cluster._args.l3_rp == "SFL":
+                self.l3.replacement_policy = SFLRP()
+            elif cluster._args.l3_rp == "BRRIP":
+                self.l3.replacement_policy = BRRIPRP()
+                self.l3.replacement_policy.btp = 3 # self.btp
 
         # connect each cluster to the memory hierarchy
         for cluster in self._clusters:

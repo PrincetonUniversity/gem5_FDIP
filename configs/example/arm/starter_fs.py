@@ -353,8 +353,12 @@ def setup_switch_cpus(args, switch_cpus, cpu_cluster):
 
             #if cpu_cluster._l1i_rp == "LRUEmissary" or cpu_cluster._l2_rp =="LRUEmissary":
             #    cpu.enableStarvationEMISSARY = True
-            #cpu.enableStarvationEMISSARY = True
-            cpu.enableEmissaryRetirement = True
+
+
+            if args.emissary_retirement:
+                cpu.enableEmissaryRetirement = True
+            else:
+                cpu.enableStarvationEMISSARY = True
 
             cpu.emissaryEnableIQEmpty = True
 
