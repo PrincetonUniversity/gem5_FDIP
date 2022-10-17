@@ -183,6 +183,9 @@ CPU::CPU(const O3CPUParams &params)
     rename.setIEWStage(&iew);
     rename.setCommitStage(&commit);
 
+    commit.virtToPhysMap = &fetch.virtToPhysMap;
+    commit.icachePort = &fetch.getInstPort();
+
     ThreadID active_threads;
     if (FullSystem) {
         active_threads = 1;
@@ -608,6 +611,7 @@ CPU::activateThread(ThreadID tid)
 void
 CPU::deactivateThread(ThreadID tid)
 {
+    DPRINTFN("deactivating\n");
     // hardware transactional memory
     // shouldn't deactivate thread in the middle of a transaction
     assert(!commit.executingHtmTransaction(tid));

@@ -85,6 +85,8 @@ class Process;
 namespace o3
 {
 
+#define PAGE_OFFSET 12
+
 class ThreadContext;
 
 /**

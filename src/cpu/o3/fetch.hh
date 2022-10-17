@@ -383,6 +383,7 @@ class Fetch
     /** The decoder. */
     TheISA::Decoder *decoder[MaxThreads];
     TheISA::Decoder *preDecoder[MaxThreads];
+    std::map<Addr, Addr> virtToPhysMap;
 
     RequestPort &getInstPort() { return icachePort; }
 

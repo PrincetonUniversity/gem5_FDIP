@@ -192,6 +192,7 @@ class BaseCPU(ClockedObject):
     enableFDIP = Param.Bool(False, "Enable FDIP")
     enableBPB = Param.Bool(False, "Enable BPB")
     oracleEMISSARY = Param.Bool(False, "Enable Oracle EMISSARY")
+    enableEmissaryRetirement = Param.Bool(False, "Enable EMSSARY at retirement")
     oracleStarvationsFileName = Param.String("", "Starvation Map file name")
     oracleStarvationCountThreshold = Param.Int(100, "Set the minimum starvation"
                                        "starvation count limit for Oracle EMISSARY policy")

@@ -107,6 +107,12 @@ Commit::Commit(CPU *_cpu, const O3CPUParams &params)
       prevSeqNum(0),
       prevFetchTick(0),
       isPrevBranch(false),
+      enableEmissaryRetirement(params.enableEmissaryRetirement),
+      emissaryEnableIQEmpty(params.emissaryEnableIQEmpty),
+      fetchBufferSize(params.fetchBufferSize),
+      starveRandomness(params.starveRandomness),
+      randomStarve(params.randomStarve),
+      pureRandom(params.pureRandom),
       prevCommCycle(0),
       instCount(1),
       prevLine(0),
@@ -1452,6 +1458,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
       //DPRINTFR(CommTrace, "%ld %ld 0x%llx %lu %c %llu %c %llu %d\n", (head_inst->fetchTick + head_inst->decodeTick), head_inst->idleCycles, head_inst->instAddr(), head_inst->instQOccDecode, mispred, curTick() , head_inst->isControl() ? 'T' : 'F', head_inst->seqNum, head_inst->squashedFromThisInst);
 
+    double random = double(rand()) * 100 / (double(RAND_MAX) + 1.0);
 
     if( prevLine != (head_inst->instAddr() >> 6 )){
         DPRINTFR(CommTrace, "%llu %ld %ld %ld 0x%llx %lu %c %llu %c %llu %c %c %d\n",
@@ -1470,6 +1477,55 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
                  head_inst->memlevel);
 
         prevLine = head_inst->instAddr() >> 6;
+        
+        //Promote here
+        if(enableEmissaryRetirement && !pureRandom && head_inst->idleCycles && head_inst->instAddr() != 0 && head_inst->memlevel > 0){
+
+            if(!emissaryEnableIQEmpty || head_inst->instQOccDecode == 0){ 
+                if (!randomStarve || random < starveRandomness){ 
+                    Addr virtAddr = head_inst->instAddr();
+                    Addr vpn = virtAddr >> PAGE_OFFSET;
+                    Addr ppn = (*virtToPhysMap)[vpn];
+
+                    Addr physAddr = ((ppn << PAGE_OFFSET) | (virtAddr & (( 1 << PAGE_OFFSET) -1)));
+
+                    DPRINTF(Commit, "Promoting vaddr: 0x%llx paddr: 0x%llx\n", virtAddr, physAddr);
+                    assert( ppn !=0 && "ppn cannot be 0");
+                    RequestPtr mem_req2 = std::make_shared<Request>(
+                        virtAddr, fetchBufferSize,
+                        Request::INST_FETCH, cpu->instRequestorId(), virtAddr,
+                        cpu->thread[tid]->contextId());
+                    mem_req2->setPaddr(physAddr);
+                    mem_req2->taskId(cpu->taskId());
+                    PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
+                    data_pkt2->setStarved(true);
+                    data_pkt2->setPreserve(true);
+                    icachePort->sendTimingStarvationReq(data_pkt2);
+                }
+            }
+        }
+
+
+        if (enableEmissaryRetirement && pureRandom && random < starveRandomness) {
+            Addr virtAddr = head_inst->instAddr();
+            Addr vpn = virtAddr >> PAGE_OFFSET;
+            Addr ppn = (*virtToPhysMap)[vpn];
+
+            Addr physAddr = ((ppn << PAGE_OFFSET) | (virtAddr & (( 1 << PAGE_OFFSET) -1)));
+
+            DPRINTF(Commit, "Promoting vaddr: 0x%llx paddr: 0x%llx\n", virtAddr, physAddr);
+            assert( ppn !=0 && "ppn cannot be 0");
+            RequestPtr mem_req2 = std::make_shared<Request>(
+                virtAddr, fetchBufferSize,
+                Request::INST_FETCH, cpu->instRequestorId(), virtAddr,
+                cpu->thread[tid]->contextId());
+            mem_req2->setPaddr(physAddr);
+            mem_req2->taskId(cpu->taskId());
+            PacketPtr data_pkt2 = new Packet(mem_req2, MemCmd::ReadReq);
+            data_pkt2->setStarved(true);
+            data_pkt2->setPreserve(true);
+            icachePort->sendTimingStarvationReq(data_pkt2);
+        }
     }
 
     if(head_inst->isControl()){

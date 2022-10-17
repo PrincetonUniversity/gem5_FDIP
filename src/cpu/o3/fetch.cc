@@ -89,6 +89,8 @@ namespace o3
 #define CACHE_LINE_SIZE_WIDTH 6 // number of bits
 #define ICACHE_ACCESS_LATENCY 2 // in cycles
 #define INST_SIZE 4 // in bytes
+
+
 enum Repl {ORACLE, LRU, RANDOM, NONE};
 //enum Repl REPL = ORACLE; // sets replacement policy
 vector<vector<Addr> > oneMisses[SETS];
@@ -945,15 +947,17 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
         if (inst->isDirectCtrl() && bblAddr[tid] != 0) {
             DPRINTF(Bgodala, "BBLInsert Inserting bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
                     bblAddr[tid], inst->pcState().instAddr(), inst->branchTarget(), bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
-            assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
-            branchPred->BTBUpdate(bblAddr[tid],
-                                  inst->staticInst,
-                                  inst->pcState(),
-                                  bblSize[tid],
-                                  inst->branchTarget(),
-                                  ftPC,
-                                  inst->isUncondCtrl(),
-                                  tid);
+            //assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
+            if((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]){
+                branchPred->BTBUpdate(bblAddr[tid],
+                                      inst->staticInst,
+                                      inst->pcState(),
+                                      bblSize[tid],
+                                      inst->branchTarget(),
+                                      ftPC,
+                                      inst->isUncondCtrl(),
+                                      tid);
+            }
         }
         else if (inst->isControl() && bblAddr[tid] != 0) {
             TheISA::PCState dummyBranchTarget = ftPC;
@@ -962,15 +966,17 @@ Fetch::lookupAndUpdateNextPC(const DynInstPtr &inst, TheISA::PCState &nextPC)
 
             DPRINTF(Bgodala, "BBLInsert Inserting Indirect ctrl bblAddr[tid]: %#x instAddr: %#x branchTarget: %#x bblSize: %d diff: %d\n",
                     bblAddr[tid], inst->pcState().instAddr(), dummyBranchTarget, bblSize[tid], inst->pcState().instAddr() - bblAddr[tid]);
-            assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
-            branchPred->BTBUpdate(bblAddr[tid],
-                                  inst->staticInst,
-                                  inst->pcState(),
-                                  bblSize[tid],
-                                  dummyBranchTarget,
-                                  ftPC,
-                                  inst->isUncondCtrl(),
-                                  tid);
+            //assert(((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]) && "BBLInsert Mismatch" );
+            if((inst->pcState().instAddr() - bblAddr[tid]) == bblSize[tid]){
+                branchPred->BTBUpdate(bblAddr[tid],
+                                      inst->staticInst,
+                                      inst->pcState(),
+                                      bblSize[tid],
+                                      dummyBranchTarget,
+                                      ftPC,
+                                      inst->isUncondCtrl(),
+                                      tid);
+            }
         }
     }
     if (!prefetchQueue[tid].empty()) {
@@ -1309,6 +1315,13 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
 
     // If translation was successful, attempt to read the icache block.
     if (fault == NoFault) {
+        //Populate Virtual to Physical Address Map here
+
+       Addr vpn = (mem_req->getVaddr()) >> PAGE_OFFSET;
+       Addr ppn = (mem_req->getPaddr()) >> PAGE_OFFSET;
+
+       virtToPhysMap[vpn] = ppn;
+
         // Check that we're not going off into random memory
         // If we have, just wait around for commit to squash something and put
         // us on the right track

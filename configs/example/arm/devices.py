@@ -91,7 +91,7 @@ class L2(L2Cache):
 
 
 class L3(Cache):
-    size = '2MB'
+    size = '8MB'
     assoc = 16
     tag_latency = 20
     data_latency = 20
@@ -139,8 +139,8 @@ class CpuCluster(SubSystem):
 
             print(cpu_type)
             if cpu_type == O3CPU:
-                if args.fdip:
-                    cpu.enableFDIP = args.fdip
+                #if args.fdip:
+                #    cpu.enableFDIP = args.fdip
 
                 if args.bpb:
                     cpu.enableBPB = args.bpb
@@ -194,15 +194,15 @@ class CpuCluster(SubSystem):
                     cpu.oracleStarvationCountThreshold = args.oracleStarvationCountThreshold
 
 
-                if self._l1i_rp == "LRUEmissary" or self._l2_rp =="LRUEmissary":
-                    cpu.enableStarvationEMISSARY = True
-                cpu.enableStarvationEMISSARY = True
+                #if self._l1i_rp == "LRUEmissary" or self._l2_rp =="LRUEmissary":
+                #    cpu.enableStarvationEMISSARY = True
+                #cpu.enableStarvationEMISSARY = True
 
 
-                if args.totalSimInsts:
-                    cpu.totalSimInsts = args.totalSimInsts
-                    if args.warmup_insts:
-                        cpu.totalSimInsts += args.warmup_insts
+                #if args.totalSimInsts:
+                #    cpu.totalSimInsts = args.totalSimInsts
+                #    if args.warmup_insts:
+                #        cpu.totalSimInsts += args.warmup_insts
 
                 # 0: ORACLE
                 # 1: LRU
@@ -214,11 +214,14 @@ class CpuCluster(SubSystem):
                 if args.numSets:
                     cpu.numSets = args.numSets
 
-            if args.maxinsts:
-                cpu.max_insts_any_thread = args.maxinsts
-                if args.warmup_insts:
-                    cpu.max_insts_any_thread += args.warmup_insts
+            #if args.maxinsts:
+            #    cpu.max_insts_any_thread = args.maxinsts
+            #    if args.warmup_insts:
+            #        cpu.max_insts_any_thread += args.warmup_insts
 
+            if args.warmup_insts:
+                cpu.totalSimInsts = args.warmup_insts
+                cpu.max_insts_any_thread = args.warmup_insts
 
             if args.bp_type:
                 bpClass = ObjectList.bp_list.get(args.bp_type)

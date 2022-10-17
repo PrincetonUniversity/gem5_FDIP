@@ -350,6 +350,9 @@ class Commit
   public:
     /** ROB interface. */
     ROB *rob;
+    
+    std::map<Addr, Addr> *virtToPhysMap;
+    RequestPort *icachePort;
 
   private:
     /** Pointer to O3CPU. */
@@ -485,6 +488,12 @@ class Commit
     uint64_t prevSeqNum;
     uint64_t prevFetchTick;
     bool isPrevBranch;
+    bool enableEmissaryRetirement;
+    bool emissaryEnableIQEmpty;
+    unsigned fetchBufferSize;
+    double starveRandomness;
+    bool randomStarve;
+    bool pureRandom;
     uint64_t prevCommCycle;
     uint64_t instCount;
     Addr prevLine;

@@ -68,7 +68,12 @@ default_root_device = '/dev/vda'
 # the cache class may be 'None' if the particular cache is not present.
 cpu_types = {
 
-    "atomic" : ( AtomicSimpleCPU, None, None, None, None),
+    #"atomic" : ( AtomicSimpleCPU, None, None, None, None),
+    #"atomic" : ( AtomicSimpleCPU, None, None, None, None),
+    "atomic" : ( AtomicSimpleCPU,
+               devices.L1I, devices.L1D,
+               devices.WalkCache,
+               devices.L2),
     "minor" : (MinorCPU,
                devices.L1I, devices.L1D,
                devices.WalkCache,
@@ -109,7 +114,9 @@ def create(args):
     else:
         cpu_class = cpu_types[args.cpu][0]
         mem_mode = cpu_class.memory_mode()
-        want_caches = True if mem_mode == "timing" else False
+        #mem_mode = "timing"
+        want_caches = True
+        #want_caches = True if mem_mode == "timing" else False
 
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
     #want_caches = True
@@ -219,37 +226,176 @@ def parse_stats(args):
     #    pass
     return found
 
-def run(args):
+def run(args, switch_cpu_list=None, root=None):
     cptdir = m5.options.outdir
     if args.checkpoint:
         print("Checkpoint directory: %s" % cptdir)
 
-    if args.warmup_insts:
-        while True:
-            event = m5.simulate(250000000)
-            m5.stats.dump()
-            if(parse_stats(args)):
-                break
+    #while True:
+    #    event = m5.simulate(5000000)
+    #    exit_msg = event.getCause()
+    #    m5.stats.dump()
 
-        # Reset stats and prepare to get final stats
+    #    if "max instruction" in exit_msg:
+    #        break
+    #while True:
+    #    event = m5.simulate()
+
+    if not switch_cpu_list is None:
+        event = m5.simulate()
+        m5.switchCpus(root.system, switch_cpu_list)
+
+        tmp_cpu_list = []
+        for old_cpu, new_cpu in switch_cpu_list:
+            tmp_cpu_list.append((new_cpu, old_cpu))
+        switch_cpu_list = tmp_cpu_list
+
+        print("REAL SIMULATION")
+        m5.stats.dump()
         m5.stats.reset()
-        m5.stats.outputList.clear()
-        m5.stats.addStatVisitor("stats_final.txt")
-
-    while True:
         event = m5.simulate()
         exit_msg = event.getCause()
-        if exit_msg == "checkpoint":
-            print("Dropping checkpoint at tick %d" % m5.curTick())
-            cpt_dir = os.path.join(m5.options.outdir, "cpt.%d" % m5.curTick())
-            m5.checkpoint(os.path.join(cpt_dir))
-            print("Checkpoint done.")
-        else:
-            print(exit_msg, " @ ", m5.curTick())
-            break
+        print(exit_msg, " @ ", m5.curTick())
 
-    m5.stats.dump()
+    else:
+        if args.warmup_insts:
+            while True:
+                event = m5.simulate(250000000)
+                m5.stats.dump()
+                if not switch_cpu_list is None:
+                    m5.switchCpus(root.system, switch_cpu_list)
+                    tmp_cpu_list = []
+                    for old_cpu, new_cpu in switch_cpu_list:
+                        tmp_cpu_list.append((new_cpu, old_cpu))
+                    switch_cpu_list = tmp_cpu_list
+
+                if(parse_stats(args)):
+                    break
+
+            # Reset stats and prepare to get final stats
+            m5.stats.reset()
+            m5.stats.outputList.clear()
+            m5.stats.addStatVisitor("stats_final.txt")
+
+        while True:
+            event = m5.simulate()
+            exit_msg = event.getCause()
+            if exit_msg == "checkpoint":
+                print("Dropping checkpoint at tick %d" % m5.curTick())
+                cpt_dir = os.path.join(m5.options.outdir, "cpt.%d" % m5.curTick())
+                m5.checkpoint(os.path.join(cpt_dir))
+                print("Checkpoint done.")
+            else:
+                print(exit_msg, " @ ", m5.curTick())
+                break
+
+        m5.stats.dump()
+
     sys.exit(event.getCode())
+
+def setup_switch_cpus(args, switch_cpus, cpu_cluster):
+
+    for cpu,old_cpu in zip(switch_cpus, cpu_cluster.cpus):
+
+        print(type(cpu))
+        if type(cpu) == O3CPU:
+            if args.fdip:
+                cpu.enableFDIP = args.fdip
+
+            if args.perfectICache:
+                cpu.enablePerfectICache = args.perfectICache
+
+            if args.starveAtleast:
+                cpu.starveAtleast = args.starveAtleast
+
+            if args.randomStarve:
+                cpu.randomStarve = args.randomStarve
+
+            if args.starveRandomness:
+                cpu.starveRandomness = args.starveRandomness
+
+            if args.pureRandom:
+                cpu.pureRandom = args.pureRandom
+
+            if args.dump_tms:
+                cpu.dumpTms = args.dump_tms
+
+            if args.dump_btbconf:
+                cpu.dumpBTBConf = args.dump_btbconf
+
+            if args.btbConfThreshold:
+                cpu.btbConfThreshold = args.btbConfThreshold
+
+            if args.btbConfMinInst:
+                cpu.btbConfMinInst = args.btbConfMinInst
+
+            if args.histRandom:
+                cpu.histRandom = args.histRandom
+
+            if args.fetchQSize:
+                cpu.fetchQueueSize = args.fetchQSize
+
+            if args.ftqSize >=0:
+                cpu.ftqSize = args.ftqSize
+
+            if args.ftqInst >0:
+                cpu.ftqInst = args.ftqInst
+
+            if args.oracleEMISSARY:
+                cpu.oracleEMISSARY = args.oracleEMISSARY
+
+            if args.oracleStarvationsFileName:
+                cpu.oracleStarvationsFileName = args.oracleStarvationsFileName
+
+            if args.oracleStarvationCountThreshold:
+                cpu.oracleStarvationCountThreshold = args.oracleStarvationCountThreshold
+
+
+            #if cpu_cluster._l1i_rp == "LRUEmissary" or cpu_cluster._l2_rp =="LRUEmissary":
+            #    cpu.enableStarvationEMISSARY = True
+            #cpu.enableStarvationEMISSARY = True
+            cpu.enableEmissaryRetirement = True
+
+            cpu.emissaryEnableIQEmpty = True
+
+            if args.totalSimInsts:
+                cpu.totalSimInsts = args.totalSimInsts
+                #if args.warmup_insts:
+                #    cpu.totalSimInsts += args.warmup_insts
+
+            # 0: ORACLE
+            # 1: LRU
+            # 2: RANDOM
+            # 3: NONE
+            if args.opt:
+                cpu.cache_repl = 0
+
+            if args.numSets:
+                cpu.numSets = args.numSets
+
+            #cpu.mmu = old_cpu.mmu
+            #cpu.icache_port = old_cpu.icache_port
+            #cpu.dcache_port = old_cpu.dcache_port
+
+        if args.maxinsts:
+            cpu.max_insts_any_thread = args.maxinsts
+            #if args.warmup_insts:
+            #    cpu.max_insts_any_thread += args.warmup_insts
+
+
+        cpu.branchPred = old_cpu.branchPred
+        #cpu.brancPred.indirectBranchPred = old_cpu.brancPred.indirectBranchPred
+        #if args.bp_type:
+        #    bpClass = ObjectList.bp_list.get(args.bp_type)
+        #    cpu.branchPred = bpClass()
+        #    if args.btb_entries:
+        #        cpu.branchPred.BTBEntries = args.btb_entries
+        #        #cpu.branchPred.BTBEntries = 64*1024*1024
+        #        cpu.branchPred.BTBTagSize = 64 - (math.log(cpu.branchPred.BTBEntries,2) + 2)
+        #    #indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')
+        #    indirectBPClass = ObjectList.indirect_bp_list.get('ITTAGE')
+        #    cpu.branchPred.indirectBranchPred = indirectBPClass()
+
 
 
 def main():
@@ -301,12 +447,33 @@ def main():
     root = Root(full_system=True)
     root.system = create(args)
 
+
+    switch_cpus = [ O3CPU(switched_out=True, cpu_id=idx)
+                  for idx in range(args.num_cores) ]
+
+    #switch_cpus = root.system.cpu_cluster[0].switch_cpus
+    root.system.switch_cpus = switch_cpus
+    #root.system.cpus = root.system.cpu_cluster[0].cpus
+
+    switch_cpu_list = [(root.system.cpu_cluster[0].cpus[i], switch_cpus[i]) for i in range(args.num_cores)]
+
+    for i in range(args.num_cores):
+        switch_cpus[i].isa = root.system.cpu_cluster[0].cpus[i].isa
+        switch_cpus[i].system = root.system
+        switch_cpus[i].clk_domain = root.system.cpu_cluster[0].cpus[i].clk_domain
+
+    setup_switch_cpus(args, switch_cpus,root.system.cpu_cluster[0])
+
     if args.restore is not None:
         m5.instantiate(args.restore)
     else:
         m5.instantiate()
 
-    run(args)
+    #(TestCPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
+    #print(root.system.cpu_cluster[0].num_cpus)
+    run(args, switch_cpu_list, root)
+    #run(args)
+    #Simulation.run(args, root, root.system, FutureClass)
 
 
 if __name__ == "__m5_main__":
