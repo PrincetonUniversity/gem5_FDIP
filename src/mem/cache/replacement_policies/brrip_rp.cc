@@ -71,7 +71,9 @@ BRRIP::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
     if (hitPriority) {
         casted_replacement_data->rrpv.reset();
     } else {
-        casted_replacement_data->rrpv--;
+        if(casted_replacement_data->rrpv){
+            casted_replacement_data->rrpv--;
+        }
     }
 }
 
@@ -129,18 +131,16 @@ BRRIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data,
         if(is_inst){
             casted_replacement_data->rrpv--;
         }
-        return;
-    }
-    if(enable_sfl && is_sfl){
+    }else if(enable_sfl && is_sfl){
         //DPRINTFN("SFL promotion\n");
         casted_replacement_data->rrpv.reset();
-        return;
-    }
-    // Reset RRPV
-    // Replacement data is inserted as "long re-reference" if lower than btp,
-    // "distant re-reference" otherwise
-    if (random_mt.random<unsigned>(1, 100) <= btp) {
-        casted_replacement_data->rrpv--;
+    }else{
+        // Reset RRPV
+        // Replacement data is inserted as "long re-reference" if lower than btp,
+        // "distant re-reference" otherwise
+        if (random_mt.random<unsigned>(1, 100) <= btp) {
+            casted_replacement_data->rrpv--;
+        }
     }
 
     // Mark entry as ready to be used

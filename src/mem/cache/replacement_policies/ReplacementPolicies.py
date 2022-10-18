@@ -135,6 +135,12 @@ class CLIPRP(BRRIPRP):
     clip  = True
     inst_only = True
 
+class DCLIPRP(DuelingRP):
+    replacement_policy_a = BRRIPRP()
+    replacement_policy_b = CLIPRP()
+    team_size = 16
+    constituency_size = 32
+
 class SFLRP(BRRIPRP):
     enable_sfl  = True
 
