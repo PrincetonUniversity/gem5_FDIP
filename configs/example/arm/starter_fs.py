@@ -452,21 +452,21 @@ def main():
     root.system = create(args)
 
 
-    switch_cpus = [ O3CPU(switched_out=True, cpu_id=idx)
-                  for idx in range(args.num_cores) ]
+    #switch_cpus = [ O3CPU(switched_out=True, cpu_id=idx)
+    #              for idx in range(args.num_cores) ]
 
-    #switch_cpus = root.system.cpu_cluster[0].switch_cpus
-    root.system.switch_cpus = switch_cpus
-    #root.system.cpus = root.system.cpu_cluster[0].cpus
+    ##switch_cpus = root.system.cpu_cluster[0].switch_cpus
+    #root.system.switch_cpus = switch_cpus
+    ##root.system.cpus = root.system.cpu_cluster[0].cpus
 
-    switch_cpu_list = [(root.system.cpu_cluster[0].cpus[i], switch_cpus[i]) for i in range(args.num_cores)]
+    #switch_cpu_list = [(root.system.cpu_cluster[0].cpus[i], switch_cpus[i]) for i in range(args.num_cores)]
 
-    for i in range(args.num_cores):
-        switch_cpus[i].isa = root.system.cpu_cluster[0].cpus[i].isa
-        switch_cpus[i].system = root.system
-        switch_cpus[i].clk_domain = root.system.cpu_cluster[0].cpus[i].clk_domain
+    #for i in range(args.num_cores):
+    #    switch_cpus[i].isa = root.system.cpu_cluster[0].cpus[i].isa
+    #    switch_cpus[i].system = root.system
+    #    switch_cpus[i].clk_domain = root.system.cpu_cluster[0].cpus[i].clk_domain
 
-    setup_switch_cpus(args, switch_cpus,root.system.cpu_cluster[0])
+    #setup_switch_cpus(args, switch_cpus,root.system.cpu_cluster[0])
 
     if args.restore is not None:
         m5.instantiate(args.restore)
@@ -475,8 +475,8 @@ def main():
 
     #(TestCPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
     #print(root.system.cpu_cluster[0].num_cpus)
-    run(args, switch_cpu_list, root)
-    #run(args)
+    #run(args, switch_cpu_list, root)
+    run(args)
     #Simulation.run(args, root, root.system, FutureClass)
 
 

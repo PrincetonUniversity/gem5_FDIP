@@ -139,8 +139,8 @@ class CpuCluster(SubSystem):
 
             print(cpu_type)
             if cpu_type == O3CPU:
-                #if args.fdip:
-                #    cpu.enableFDIP = args.fdip
+                if args.fdip:
+                    cpu.enableFDIP = args.fdip
 
                 if args.bpb:
                     cpu.enableBPB = args.bpb
@@ -198,11 +198,19 @@ class CpuCluster(SubSystem):
                 #    cpu.enableStarvationEMISSARY = True
                 #cpu.enableStarvationEMISSARY = True
 
+                if args.emissary_retirement:
+                    cpu.enableEmissaryRetirement = True
+                else:
+                    cpu.enableStarvationEMISSARY = True
 
-                #if args.totalSimInsts:
-                #    cpu.totalSimInsts = args.totalSimInsts
-                #    if args.warmup_insts:
-                #        cpu.totalSimInsts += args.warmup_insts
+                cpu.emissaryEnableIQEmpty = True
+
+
+
+                if args.totalSimInsts:
+                    cpu.totalSimInsts = args.totalSimInsts
+                    if args.warmup_insts:
+                        cpu.totalSimInsts += args.warmup_insts
 
                 # 0: ORACLE
                 # 1: LRU
@@ -214,14 +222,14 @@ class CpuCluster(SubSystem):
                 if args.numSets:
                     cpu.numSets = args.numSets
 
-            #if args.maxinsts:
-            #    cpu.max_insts_any_thread = args.maxinsts
-            #    if args.warmup_insts:
-            #        cpu.max_insts_any_thread += args.warmup_insts
+            if args.maxinsts:
+                cpu.max_insts_any_thread = args.maxinsts
+                if args.warmup_insts:
+                    cpu.max_insts_any_thread += args.warmup_insts
 
-            if args.warmup_insts:
-                cpu.totalSimInsts = args.warmup_insts
-                cpu.max_insts_any_thread = args.warmup_insts
+            #if args.warmup_insts:
+            #    cpu.totalSimInsts = args.warmup_insts
+            #    cpu.max_insts_any_thread = args.warmup_insts
 
             if args.bp_type:
                 bpClass = ObjectList.bp_list.get(args.bp_type)
@@ -327,8 +335,9 @@ class CpuCluster(SubSystem):
             self.l2.replacement_policy = BRRIPRP()
             self.l2.replacement_policy.btp = 3 # self.btp
         elif self._l2_rp == "CLIP":
-            self.l2.replacement_policy = CLIPRP()
-            self.l2.replacement_policy.btp = 3 # self.btp
+            self.l2.replacement_policy = DCLIPRP()
+            self.l2.replacement_policy.team_size = 16 # self.btp
+            #self.l2.replacement_policy.btp = 3 # self.btp
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size
