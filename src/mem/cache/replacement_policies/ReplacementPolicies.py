@@ -136,10 +136,10 @@ class CLIPRP(BRRIPRP):
     inst_only = True
 
 class DCLIPRP(DuelingRP):
-    replacement_policy_a = BRRIPRP()
-    replacement_policy_b = CLIPRP()
+    replacement_policy_a = CLIPRP()
+    replacement_policy_b = BRRIPRP()
     team_size = 16
-    constituency_size = 32
+    constituency_size = 512
 
 class SFLRP(BRRIPRP):
     enable_sfl  = True
