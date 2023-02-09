@@ -153,6 +153,7 @@ class BaseCache(ClockedObject):
     # in the current cache. Typically, this would be enabled in the
     # data cache.
     write_allocator = Param.WriteAllocator(NULL, "Write allocator")
+    perfect_no_cold = Param.Bool(False, "Enable perfect no cold at L2")
 
 class Cache(BaseCache):
     type = 'Cache'

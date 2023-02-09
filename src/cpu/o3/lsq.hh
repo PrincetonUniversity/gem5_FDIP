@@ -148,6 +148,13 @@ class LSQ
             // @todo: Is there a need for potential invalidation here?
         }
 
+        virtual Tick 
+        recvAtomicSnoopReq(PacketPtr pkt) 
+        {
+            // @todo: Is there a need for potential invalidation here?
+            return Tick(0);
+        }
+
         /** Handles doing a retry of the previous send. */
         virtual void recvReqRetry();
 

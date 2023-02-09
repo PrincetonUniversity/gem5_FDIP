@@ -110,6 +110,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       noTargetMSHR(nullptr),
       missCount(p.max_miss_count),
       addrRanges(p.addr_ranges.begin(), p.addr_ranges.end()),
+      perfect_no_cold(p.perfect_no_cold),
       system(p.system),
       stats(*this)
 {
@@ -429,6 +430,10 @@ BaseCache::recvTimingReq(PacketPtr pkt)
     // anything that is merely forwarded pays for the forward latency and
     // the delay provided by the crossbar
     Tick forward_time = clockEdge(forwardLatency) + pkt->headerDelay;
+    
+    //if (perfect_no_cold && pkt->req->isInstFetch() && this->name() == "system.cpu_cluster.l2"){ 
+    //    DPRINTFN("recvTimingReq paddr: 0x%llx name: %s cmd %s reqId:%d \n", pkt->getAddr(), this->name(), pkt->cmd.toString(), pkt->req->requestorId());
+    //}
 
     Cycles lat;
     CacheBlk *blk = nullptr;
@@ -444,6 +449,7 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         // happening below
         doWritebacks(writebacks, clockEdge(lat + forwardLatency));
     }
+
 
     // Here we charge the headerDelay that takes into account the latencies
     // of the bus, if the packet comes from it.
@@ -484,6 +490,32 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         }
 
         handleTimingReqHit(pkt, blk, request_time);
+    } else if (perfect_no_cold && !satisfied && pkt->req->isInstFetch() && this->name() == "system.cpu_cluster.l2" 
+            && pkt->isRead()
+            && inst_non_cold_map.find(pkt->getAddr()) != inst_non_cold_map.end()){
+
+        //DPRINTFN("recvTimingReq paddr: 0x%llx name: %s\n", pkt->getAddr(), this->name());
+        DPRINTFN("NON COLD ACCESS\n");
+
+        ////Handle Miss here
+        //RequestPtr req = std::make_shared<Request>(pkt->req->getPaddr(),
+        //                                        pkt->req->getSize(),
+        //                                        pkt->req->getFlags(),
+        //                                        pkt->req->requestorId());
+        //auto pf = new Packet(req, pkt->cmd);
+        //pf->allocate();
+        //handleTimingReqMiss(pf, blk, forward_time, request_time);
+        ////handleAtomicReqMiss(pf, blk, request_time);
+
+        //pkt->setDataFromBlock(inst_non_cold_map[pkt->getAddr()], blkSize);
+        //handleTimingReqHit(pkt, nullptr, request_time);
+
+        if (pkt->needsResponse()) {
+            recvAtomic(pkt);
+            //functionalAccess(pkt, true);
+            cpuSidePort.schedTimingResp(pkt, request_time);
+        }
+
     } else {
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
 
@@ -584,6 +616,13 @@ BaseCache::recvTimingResp(PacketPtr pkt)
         blk = handleFill(pkt, blk, writebacks, allocate);
         assert(blk != nullptr);
         ppFill->notify(pkt);
+
+        if (perfect_no_cold && pkt->req->isInstFetch() && this->name() == "system.cpu_cluster.l2"){
+            //DPRINTFN("recvTimingResp paddr: 0x%llx blkSize:%d pktSize:%d\n", pkt->getAddr(), blkSize, pkt->getSize());
+            //uint8_t *d_data = new uint8_t[blkSize];
+            //std::memcpy(d_data, blk->data, blkSize);
+            inst_non_cold_map[pkt->getAddr()] = nullptr; 
+        }
     }
 
     if (blk && blk->isValid() && pkt->isClean() && !pkt->isInvalidate()) {

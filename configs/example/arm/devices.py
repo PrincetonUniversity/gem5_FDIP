@@ -91,7 +91,7 @@ class L2(L2Cache):
 
 
 class L3(Cache):
-    size = '8MB'
+    size = '2MB'
     assoc = 16
     tag_latency = 20
     data_latency = 20
@@ -338,6 +338,9 @@ class CpuCluster(SubSystem):
             self.l2.replacement_policy = DCLIPRP()
             self.l2.replacement_policy.team_size = 16 # self.btp
             #self.l2.replacement_policy.btp = 3 # self.btp
+        elif self._l2_rp == "PerfectNoCold":
+            self.l2.replacement_policy = LRURP()
+            self.l2.perfect_no_cold = True
 
         if self._args.l2_size:
             self.l2.size = self._args.l2_size
@@ -352,6 +355,7 @@ class CpuCluster(SubSystem):
         for cpu in self.cpus:
             cpu.connectAllPorts(self.toL2Bus)
         self.toL2Bus.mem_side_ports = self.l2.cpu_side
+        self.toL2Bus.snoop_filter = NULL
         print("after addL2")
 
     def addPMUs(self, ints, events=[]):
@@ -568,6 +572,7 @@ class BaseSimpleSystem(ArmSystem):
             self.toL3Bus.mem_side_ports = self.l3.cpu_side
             self.l3.mem_side = self.membus.cpu_side_ports
             cluster_mem_bus = self.toL3Bus
+            self.toL3Bus.snoop_filter = NULL
 
             if cluster._args.l3_rp == "SFL":
                 self.l3.replacement_policy = SFLRP()
@@ -589,6 +594,7 @@ class SimpleSystem(BaseSimpleSystem):
         self.membus = MemBus()
         # CPUs->PIO
         self.iobridge = Bridge(delay='50ns')
+        self.membus.snoop_filter = NULL
 
         self._caches = caches
         if self._caches:

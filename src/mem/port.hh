@@ -227,7 +227,7 @@ class RequestPort: public Port, public AtomicRequestProtocol,
     Tick
     recvAtomicSnoop(PacketPtr pkt) override
     {
-        panic("%s was not expecting an atomic snoop request\n", name());
+        //panic("%s was not expecting an atomic snoop request\n", name());
         return 0;
     }
 

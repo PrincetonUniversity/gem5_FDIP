@@ -986,6 +986,7 @@ class BaseCache : public ClockedObject
      * The address range to which the cache responds on the CPU side.
      * Normally this is all possible memory addresses. */
     const AddrRangeList addrRanges;
+    bool perfect_no_cold;
 
   public:
     /** System we are currently operating in. */
@@ -1356,6 +1357,8 @@ class BaseCache : public ClockedObject
      */
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
+  public:
+    std::map<Addr, uint8_t*> inst_non_cold_map;
 };
 
 /**
