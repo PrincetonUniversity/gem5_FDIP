@@ -65,6 +65,8 @@ class L1D(L1_DCache):
     size = '64kB'
     assoc = 8
     write_buffers = 16
+    prefetcher = TaggedPrefetcher()
+    prefetcher.degree = 1
 
 
 class WalkCache(PageTableWalkerCache):
@@ -88,10 +90,12 @@ class L2(L2Cache):
     assoc = 16
     write_buffers = 32
     writeback_clean = True
+    prefetcher = TaggedPrefetcher()
+    prefetcher.degree = 1
 
 
 class L3(Cache):
-    size = '2MB'
+    size = '8MB'
     assoc = 16
     tag_latency = 20
     data_latency = 20
@@ -100,6 +104,8 @@ class L3(Cache):
     tgts_per_mshr = 20
     write_buffers = 64
     clusivity='mostly_excl'
+    prefetcher = TaggedPrefetcher()
+    prefetcher.degree = 1
 
 
 class MemBus(SystemXBar):
@@ -331,12 +337,20 @@ class CpuCluster(SubSystem):
         elif self._l2_rp == "BIP":
             self.l2.replacement_policy = BIPRP()
             self.l2.replacement_policy.btp = 3 # self.btp
+        elif self._l2_rp == "DRRIP":
+            self.l2.replacement_policy = DRRIPRP()
+        elif self._l2_rp == "RRIP":
+            self.l2.replacement_policy = RRIPRP()
         elif self._l2_rp == "BRRIP":
             self.l2.replacement_policy = BRRIPRP()
             self.l2.replacement_policy.btp = 3 # self.btp
-        elif self._l2_rp == "CLIP":
+            self.l2.replacement_policy.hit_priority = True
+        elif self._l2_rp == "DCLIP":
             self.l2.replacement_policy = DCLIPRP()
             self.l2.replacement_policy.team_size = 16 # self.btp
+            #self.l2.replacement_policy.btp = 3 # self.btp
+        elif self._l2_rp == "CLIP":
+            self.l2.replacement_policy = CLIPRP()
             #self.l2.replacement_policy.btp = 3 # self.btp
         elif self._l2_rp == "PerfectNoCold":
             self.l2.replacement_policy = LRURP()
@@ -576,6 +590,12 @@ class BaseSimpleSystem(ArmSystem):
 
             if cluster._args.l3_rp == "SFL":
                 self.l3.replacement_policy = SFLRP()
+            elif cluster._args.l3_rp == "DRRIP":
+                self.l3.replacement_policy = DRRIPRP()
+                self.l3.replacement_policy.team_size = 16
+                self.l3.replacement_policy.constituency_size = 512
+            elif cluster._args.l3_rp == "RRIP":
+                self.l3.replacement_policy = RRIPRP()
             elif cluster._args.l3_rp == "BRRIP":
                 self.l3.replacement_policy = BRRIPRP()
                 self.l3.replacement_policy.btp = 3 # self.btp

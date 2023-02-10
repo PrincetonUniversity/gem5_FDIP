@@ -130,19 +130,23 @@ class BRRIPRP(BaseReplacementPolicy):
 
 class RRIPRP(BRRIPRP):
     btp = 100
+    hit_priority = True
 
 class CLIPRP(BRRIPRP):
     clip  = True
     inst_only = True
+    #hit_priority = True
 
 class DCLIPRP(DuelingRP):
     replacement_policy_a = CLIPRP()
     replacement_policy_b = BRRIPRP()
     team_size = 16
     constituency_size = 512
+    replacement_policy_b.hit_priority = True
 
 class SFLRP(BRRIPRP):
     enable_sfl  = True
+    hit_priority = True
 
 class DRRIPRP(DuelingRP):
     # The constituency_size and the team_size must be manually provided, where:
@@ -151,8 +155,12 @@ class DRRIPRP(DuelingRP):
     # The paper assumes that:
     #     num_dueling_sets = 32
     #     team_size = num_entries_per_set
+    team_size = 16
+    constituency_size = 512
     replacement_policy_a = BRRIPRP()
     replacement_policy_b = RRIPRP()
+    replacement_policy_a.hit_priority = True
+    replacement_policy_b.hit_priority = True
 
 class NRURP(BRRIPRP):
     btp = 100

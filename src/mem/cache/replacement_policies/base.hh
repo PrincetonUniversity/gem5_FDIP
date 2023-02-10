@@ -98,7 +98,8 @@ class Base : public SimObject
     virtual void reset(const std::shared_ptr<ReplacementData>&
         replacement_data, const PacketPtr pkt)
     {
-         reset_inst_line(replacement_data, pkt->req->isInstFetch(), pkt->isSFL());
+
+        reset_inst_line(replacement_data, pkt->req->isInstFetch(), pkt->isSFL());
     }
 
     virtual void reset(const std::shared_ptr<ReplacementData>&

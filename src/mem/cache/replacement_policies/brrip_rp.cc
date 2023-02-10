@@ -127,10 +127,12 @@ BRRIP::reset_inst_line(const std::shared_ptr<ReplacementData>& replacement_data,
         std::static_pointer_cast<BRRIPReplData>(replacement_data);
 
     casted_replacement_data->rrpv.saturate();
-    if(clip){
-        if(is_inst){
-            casted_replacement_data->rrpv--;
-        }
+    if(clip && is_inst){
+        //if(is_inst){
+            //casted_replacement_data->rrpv--;
+            //Reset inst line to give it highest priority
+            casted_replacement_data->rrpv.reset();
+        //}
     }else if(enable_sfl && is_sfl){
         //DPRINTFN("SFL promotion\n");
         casted_replacement_data->rrpv.reset();
