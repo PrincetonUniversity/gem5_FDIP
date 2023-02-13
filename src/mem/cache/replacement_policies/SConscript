@@ -48,3 +48,5 @@ Source('weighted_lru_rp.cc')
 Source('opt_rp.cc')
 Source('plru_rp.cc')
 Source('pdp_rp.cc')
+
+DebugFlag('PDP')

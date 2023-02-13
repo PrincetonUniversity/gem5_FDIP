@@ -81,16 +81,16 @@ PDP::updateAccess(const std::shared_ptr<ReplacementData>& replacement_data) cons
     CacheBlk *cur_blk = repl_data->blk;
     auto set = cur_blk->getSet();
 
-    //DPRINTFN("Age of set %d :", set);
+    DPRINTF(PDP, "Age of set %d :", set);
     for(int way=0; way < numWays; way++){
 
         ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
         CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
         auto candidate_repl_data = std::static_pointer_cast<PDPReplData>(blk->replacementData);
         candidate_repl_data->rrpv--;
-        //DPRINTFNR(" %d",candidate_repl_data->rrpv);
+        DPRINTFR(PDP, " %d",candidate_repl_data->rrpv);
     }
-    //DPRINTFNR("\n");
+    DPRINTFR(PDP, "\n");
 
     //if(allOnes){
     //    resetAll(entries, preserve);
@@ -144,6 +144,7 @@ PDP::updateRD(int set, Addr tag)
 
     if(it != access_queue.end()){
         int rd = access_queue.size() - (access_queue.begin() - it);
+        DPRINTF(PDP,"Reuse distance for addr: %llx is %d set %d\n", tag, rd, set); 
         if(rd < maxRD){
             RDCounter[rd]++;
         }
@@ -168,6 +169,7 @@ PDP::getVictim(const ReplacementCandidates& candidates) const
     ReplaceableEntry* victim = candidates[0];
 
     ReplaceableEntry* inserted_victim = NULL;
+    ReplaceableEntry* unprotected_victim = NULL;
     int inserted_victim_RRPV = 0;
 
     // Store victim->rrpv in a variable to improve code readability
@@ -185,6 +187,9 @@ PDP::getVictim(const ReplacementCandidates& candidates) const
             return candidate;
         }
 
+        if(candidate_repl_data->rrpv == 0){
+            unprotected_victim = candidate;
+        }
         // Update victim entry if necessary
         int candidate_RRPV = candidate_repl_data->rrpv;
         if (candidate_RRPV > victim_RRPV) {
@@ -196,6 +201,10 @@ PDP::getVictim(const ReplacementCandidates& candidates) const
             inserted_victim = candidate;
             inserted_victim_RRPV = candidate_RRPV;
         }
+    }
+
+    if(unprotected_victim){
+        return unprotected_victim;
     }
 
     if(inserted_victim){

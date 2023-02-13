@@ -57,6 +57,7 @@
 #include "mem/cache/replacement_policies/base.hh"
 #include "mem/cache/cache_blk.hh"
 #include "mem/cache/tags/indexing_policies/base.hh"
+#include "debug/PDP.hh"
 
 namespace gem5
 {
