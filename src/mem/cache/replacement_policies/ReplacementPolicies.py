@@ -149,10 +149,6 @@ class DCLIPRP(DuelingRP):
     constituency_size = 512
     replacement_policy_b.hit_priority = True
 
-class SFLRP(BRRIPRP):
-    enable_sfl  = True
-    hit_priority = True
-
 class DRRIPRP(DuelingRP):
     # The constituency_size and the team_size must be manually provided, where:
     #     constituency_size = num_cache_entries /
@@ -166,6 +162,17 @@ class DRRIPRP(DuelingRP):
     replacement_policy_b = RRIPRP()
     replacement_policy_a.hit_priority = True
     replacement_policy_b.hit_priority = True
+
+class SFLRP(DuelingRP):
+    team_size = 16
+    constituency_size = 512
+    replacement_policy_a = BRRIPRP()
+    replacement_policy_b = RRIPRP()
+    replacement_policy_a.hit_priority = True
+    replacement_policy_b.hit_priority = True
+    replacement_policy_a.enable_sfl  = True
+    replacement_policy_b.enable_sfl  = True
+    #hit_priority = True
 
 class NRURP(BRRIPRP):
     btp = 100
