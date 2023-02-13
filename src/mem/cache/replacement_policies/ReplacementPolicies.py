@@ -174,6 +174,13 @@ class SFLRP(DuelingRP):
     replacement_policy_b.enable_sfl  = True
     #hit_priority = True
 
+class PDPRP(BaseReplacementPolicy):
+    type = 'PDPRP'
+    cxx_class = 'gem5::replacement_policy::PDP'
+    cxx_header = "mem/cache/replacement_policies/pdp_rp.hh"
+    num_bits = Param.Int(3, "Number of PD bits per line")
+    max_access_depth = Param.Int(256, "Number of accesses to record per set")
+
 class NRURP(BRRIPRP):
     btp = 100
     num_bits = 1

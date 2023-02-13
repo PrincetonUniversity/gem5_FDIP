@@ -357,6 +357,9 @@ class CpuCluster(SubSystem):
             #self.l2.replacement_policy.btp = 3 # self.btp
         elif self._l2_rp == "PLRU":
             self.l2.replacement_policy = PLRURP()
+        elif self._l2_rp == "PDP":
+            self.l2.replacement_policy = PDPRP()
+            self.l2.replacement_policy.num_bits = 7
         elif self._l2_rp == "PerfectNoCold":
             self.l2.replacement_policy = LRURP()
             self.l2.perfect_no_cold = True

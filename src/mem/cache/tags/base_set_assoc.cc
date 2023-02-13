@@ -75,6 +75,14 @@ BaseSetAssoc::BaseSetAssoc(const Params &p)
         EmissaryPolicy->numWays = p.assoc;
         EmissaryPolicy->numSets = numBlocks/p.assoc;
     }
+    auto *PDPPolicy = dynamic_cast<replacement_policy::PDP*>(replacementPolicy);
+
+    if(PDPPolicy){
+        PDPPolicy->indexingPolicy = indexingPolicy;
+        PDPPolicy->numWays = p.assoc;
+        PDPPolicy->numSets = numBlocks/p.assoc;
+        PDPPolicy->initializeVectors();
+    }
 }
 
 void
@@ -97,9 +105,12 @@ BaseSetAssoc::tagsInit()
         blk->data = &dataBlks[blkSize*blk_index];
 
         auto *OPTPolicy = dynamic_cast<replacement_policy::OPT*>(replacementPolicy);
+        auto *PDPPolicy = dynamic_cast<replacement_policy::PDP*>(replacementPolicy);
         // Associate a replacement data entry to the block
         if(OPTPolicy){
             blk->replacementData = OPTPolicy->instantiateEntry(blk);
+        }else if(PDPPolicy){
+            blk->replacementData = PDPPolicy->instantiateEntry(blk);
         }else{
             blk->replacementData = replacementPolicy->instantiateEntry();
         }
