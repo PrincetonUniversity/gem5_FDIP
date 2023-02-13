@@ -75,6 +75,14 @@ BaseSetAssoc::BaseSetAssoc(const Params &p)
         EmissaryPolicy->numWays = p.assoc;
         EmissaryPolicy->numSets = numBlocks/p.assoc;
     }
+
+    auto *TrueEmissaryPolicy = dynamic_cast<replacement_policy::TLRUEmissary*>(replacementPolicy);
+    if(TrueEmissaryPolicy){
+        TrueEmissaryPolicy->indexingPolicy = indexingPolicy;
+        TrueEmissaryPolicy->numWays = p.assoc;
+        TrueEmissaryPolicy->numSets = numBlocks/p.assoc;
+    }
+
     auto *PDPPolicy = dynamic_cast<replacement_policy::PDP*>(replacementPolicy);
 
     if(PDPPolicy){
@@ -90,8 +98,12 @@ BaseSetAssoc::tagsInit()
 {
     //Initialize indexing policy of EMISSARY policy to be able to flush preserve bits at regular intervals
     auto *EmissaryPolicy = dynamic_cast<replacement_policy::LRUEmissary*>(replacementPolicy);
+    auto *TrueEmissaryPolicy = dynamic_cast<replacement_policy::TLRUEmissary*>(replacementPolicy);
     if(EmissaryPolicy){
         EmissaryPolicy->indexingPolicy = indexingPolicy;
+    }
+    if(TrueEmissaryPolicy){
+        TrueEmissaryPolicy->indexingPolicy = indexingPolicy;
     }
     // Initialize all blocks
     for (unsigned blk_index = 0; blk_index < numBlocks; blk_index++) {
@@ -111,6 +123,8 @@ BaseSetAssoc::tagsInit()
             blk->replacementData = OPTPolicy->instantiateEntry(blk);
         }else if(PDPPolicy){
             blk->replacementData = PDPPolicy->instantiateEntry(blk);
+        }else if(EmissaryPolicy){
+            blk->replacementData = EmissaryPolicy->instantiateEntry(blk);
         }else{
             blk->replacementData = replacementPolicy->instantiateEntry();
         }

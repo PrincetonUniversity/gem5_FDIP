@@ -89,6 +89,14 @@ class LRUEmissaryRP(BaseReplacementPolicy):
     preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways allocated to Preserve Mode")
     flush_freq_in_cycles = Param.Unsigned(0,"Frequeny in number of cycles to flush Preserve bits")
 
+class TLRUEmissaryRP(BaseReplacementPolicy):
+    type = 'TLRUEmissaryRP'
+    cxx_class = 'gem5::replacement_policy::TLRUEmissary'
+    cxx_header = "mem/cache/replacement_policies/tlru_emissary_rp.hh"
+    lru_ways = Param.Int(Parent.lru_ways, "Number of ways allocated to LRU Mode")
+    preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways allocated to Preserve Mode")
+    flush_freq_in_cycles = Param.Unsigned(0,"Frequeny in number of cycles to flush Preserve bits")
+
 class MLPLINRP(BaseReplacementPolicy):
     type = 'MLPLINRP'
     cxx_class = 'gem5::replacement_policy::MLPLIN'

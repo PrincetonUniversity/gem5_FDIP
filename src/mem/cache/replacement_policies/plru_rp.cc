@@ -79,6 +79,7 @@ PLRU::resetAll(const ReplacementCandidates& candidates) const
     }
 
 }
+
 ReplaceableEntry*
 PLRU::getVictim(const ReplacementCandidates& candidates) const
 {

@@ -26,18 +26,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "mem/cache/replacement_policies/lru_emissary_rp.hh"
+#include "mem/cache/replacement_policies/tlru_emissary_rp.hh"
 
 #include <cassert>
 #include <memory>
 #include <map>
 
-#include "params/LRUEmissaryRP.hh"
+#include "params/TLRUEmissaryRP.hh"
 #include "sim/core.hh"
 #include "base/trace.hh"
 #include "base/output.hh"
-
-#define MAX_VAL 8
 
 namespace gem5
 {
@@ -46,7 +44,7 @@ GEM5_DEPRECATED_NAMESPACE(ReplacementPolicy, replacement_policy);
 namespace replacement_policy
 {
 
-LRUEmissary::LRUEmissary(const Params &p)
+TLRUEmissary::TLRUEmissary(const Params &p)
     : Base(p), lru_ways(p.lru_ways),
     preserve_ways(p.preserve_ways),
     last_tick(0),
@@ -56,102 +54,41 @@ LRUEmissary::LRUEmissary(const Params &p)
 }
 
 void
-LRUEmissary::invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
+TLRUEmissary::invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
 {
     // Reset last touch timestamp
-    std::static_pointer_cast<LRUEmissaryReplData>(
-        replacement_data)->lastTouchTick = 0;
+    std::static_pointer_cast<TLRUEmissaryReplData>(
+        replacement_data)->lastTouchTick = Tick(0);
 }
 
 void
-LRUEmissary::checkLRU(const std::shared_ptr<ReplacementData>& replacement_data) const
+TLRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
-    //Age LRU Bits of a given set
-    auto repl_data = static_pointer_cast<LRUEmissaryReplData>(replacement_data);
-    CacheBlk *cur_blk = repl_data->blk;
-    auto set = cur_blk->getSet();
-
-    bool preserve = cur_blk->isPreserve();
-    std::vector<ReplaceableEntry*> entries; 
-
-    bool allOnes = true;
-    //DPRINTFN("Age of set %d :", set);
-    for(int way=0; way < numWays; way++){
-
-        ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
-        CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
-        auto candidate_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(blk->replacementData);
-        if(candidate_repl_data->lastTouchTick > 1){
-            candidate_repl_data->lastTouchTick--;
-        }
-        //DPRINTFNR(" %d",candidate_repl_data->lastTouchTick);
-        if(((preserve == blk->isPreserve())) && candidate_repl_data->lastTouchTick == 0){
-            allOnes = false;
-        }
-        entries.push_back(entry);
-    }
-    //DPRINTFNR("\n");
-
-    //if(allOnes){
-    //    resetAll(entries, preserve);
-    //    //DPRINTFN("All Ones set %d when updating way %d preserved %d\n", set, cur_blk->getWay(), preserve);
-    //}
- 
-}
-
-void
-LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
-{
-    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    auto *non_const_this = const_cast<TLRUEmissary*>(this);
     non_const_this->checkToFlushPreserveBits();
-
 
     // Update last touch timestamp
-    //std::static_pointer_cast<LRUEmissaryReplData>(
-    //    replacement_data)->lastTouchTick = Tick(500);
-    //    //replacement_data)->lastTouchTick = curTick();
-    checkLRU(replacement_data);
-
-    std::static_pointer_cast<LRUEmissaryReplData>(
-        replacement_data)->lastTouchTick = MAX_VAL;
-
+    std::static_pointer_cast<TLRUEmissaryReplData>(
+        replacement_data)->lastTouchTick = curTick();
 }
 
 void
-LRUEmissary::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
+TLRUEmissary::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
-    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    auto *non_const_this = const_cast<TLRUEmissary*>(this);
     non_const_this->checkToFlushPreserveBits();
-    //
-    //Age LRU Bits
-    checkLRU(replacement_data);
     // Set last touch timestamp
-    std::static_pointer_cast<LRUEmissaryReplData>(
-        replacement_data)->lastTouchTick = MAX_VAL; 
-        //replacement_data)->lastTouchTick = curTick();
-}
-
-void
-LRUEmissary::resetAll(const ReplacementCandidates& candidates, bool preservedWays) const
-{
-    return;
-    for (const auto& candidate : candidates) {
-        CacheBlk *blk = reinterpret_cast<CacheBlk*>(candidate);
-        if((preservedWays == blk->isPreserve())){
-            std::static_pointer_cast<LRUEmissaryReplData>(
-                        candidate->replacementData)->lastTouchTick = 0; 
-        }
-    }
-
+    std::static_pointer_cast<TLRUEmissaryReplData>(
+        replacement_data)->lastTouchTick = curTick();
 }
 
 ReplaceableEntry*
-LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
+TLRUEmissary::getVictim(const ReplacementCandidates& candidates) const
 {
     // There must be at least one replacement candidate
     assert(candidates.size() > 0);
 
-    auto *non_const_this = const_cast<LRUEmissary*>(this);
+    auto *non_const_this = const_cast<TLRUEmissary*>(this);
     non_const_this->checkToFlushPreserveBits();
 
     // Visit all candidates to find victim
@@ -164,8 +101,6 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     uint8_t numlru = 0;
     uint8_t numpreserve = 0;
 
-    bool resetPreservedWays = true;
-    bool resetNonPreservedWays = true;
     // Find the LRU line among ones in LRU Mode
     for (const auto& candidate : candidates) {
         CacheBlk *blk = reinterpret_cast<CacheBlk*>(candidate);
@@ -175,27 +110,24 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
             if(numpreserve==1){
                 preservedEntry  = candidate;
             }else{
-                auto candidate_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(candidate->replacementData);
-                auto victim_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(preservedEntry->replacementData);
+                auto candidate_repl_data = std::static_pointer_cast<TLRUEmissaryReplData>(candidate->replacementData);
+                auto victim_repl_data = std::static_pointer_cast<TLRUEmissaryReplData>(preservedEntry->replacementData);
                 uint64_t candidate_cost = candidate_repl_data->lastTouchTick;
                 uint64_t victim_cost = victim_repl_data->lastTouchTick;
                 
                 //convert tick to time
-                candidate_cost = candidate_cost;
-                victim_cost = victim_cost;
+                candidate_cost = candidate_cost/500;
+                victim_cost = victim_cost/500;
                 
                 CacheBlk *victim_blk = reinterpret_cast<CacheBlk*>(preservedEntry);
 
-                if((candidate_cost < victim_cost)){
+                if((candidate_cost < victim_cost) && (curTick()/500 - candidate_cost > 500)){
                     //DPRINTFN("EMISSARY: very old entry candidate_cost:%llu victim_cost:%llu\n", candidate_cost, victim_cost);
                     preservedEntry = candidate;
-                    resetPreservedWays = false;
+                }else if(blk->getRefCount() < victim_blk->getRefCount()){
+                    //DPRINTFN("EMISSARY: least freq entry candidate_ref_count:%d victim_ref_count:%d\n",blk->getRefCount(),victim_blk->getRefCount());
+                    preservedEntry = candidate;
                 }
-                //else if(blk->getRefCount() < victim_blk->getRefCount()){
-                //    //DPRINTFN("EMISSARY: least freq entry candidate_ref_count:%d victim_ref_count:%d\n",blk->getRefCount(),victim_blk->getRefCount());
-                //    preservedEntry = candidate;
-                //    resetPreservedWays = false;
-                //}
 
             }
         }else{
@@ -203,20 +135,17 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
             numNotPreserved++;
             if(numNotPreserved == 1){
                 victimNotSt = candidate;
-            } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+            } else if (std::static_pointer_cast<TLRUEmissaryReplData>(
                     candidate->replacementData)->lastTouchTick <
-                std::static_pointer_cast<LRUEmissaryReplData>(
+                std::static_pointer_cast<TLRUEmissaryReplData>(
                     victimNotSt->replacementData)->lastTouchTick) {
                 victimNotSt = candidate;
-
-                resetNonPreservedWays = false;
-
             }
         }
         //LRU of all
-        if (std::static_pointer_cast<LRUEmissaryReplData>(
+        if (std::static_pointer_cast<TLRUEmissaryReplData>(
                 candidate->replacementData)->lastTouchTick <
-            std::static_pointer_cast<LRUEmissaryReplData>(
+            std::static_pointer_cast<TLRUEmissaryReplData>(
                 lruEntry->replacementData)->lastTouchTick) {
             lruEntry = candidate;
         }
@@ -224,9 +153,9 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
         //    numlru++;
         //    if (numlru == 1) {
         //        lruEntry = candidate;
-        //    } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //    } else if (std::static_pointer_cast<TLRUEmissaryReplData>(
         //            candidate->replacementData)->lastTouchTick <
-        //        std::static_pointer_cast<LRUEmissaryReplData>(
+        //        std::static_pointer_cast<TLRUEmissaryReplData>(
         //            lruEntry->replacementData)->lastTouchTick) {
         //        lruEntry = candidate;
         //    }
@@ -236,9 +165,9 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
         //        numNotPreserved++;
         //        if (numNotPreserved == 1) {
         //            victimNotSt = candidate;
-        //        } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //        } else if (std::static_pointer_cast<TLRUEmissaryReplData>(
         //                candidate->replacementData)->lastTouchTick <
-        //            std::static_pointer_cast<LRUEmissaryReplData>(
+        //            std::static_pointer_cast<TLRUEmissaryReplData>(
         //                victimNotSt->replacementData)->lastTouchTick) {
         //            victimNotSt = candidate;
         //        }
@@ -246,9 +175,9 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
         //    // Update victim entry if necessary
         //    if (numpreserve == 1) {
         //        victim = candidate;
-        //    } else if (std::static_pointer_cast<LRUEmissaryReplData>(
+        //    } else if (std::static_pointer_cast<TLRUEmissaryReplData>(
         //            candidate->replacementData)->lastTouchTick <
-        //        std::static_pointer_cast<LRUEmissaryReplData>(
+        //        std::static_pointer_cast<TLRUEmissaryReplData>(
         //            victim->replacementData)->lastTouchTick) {
         //        victim = candidate;
         //    }
@@ -257,13 +186,6 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
 
     //DPRINTFN("EMISSRY RP: numlru:%d numNotPreserved:%d numPreserved:%d\n",numlru, numNotPreserved, numpreserve);
     //assert(numpreserve <= preserve_ways && "numpreserve must be less than preserve_ways\n");
-
-    if(resetPreservedWays){
-        resetAll(candidates, true);
-    }
-    if(resetNonPreservedWays){
-        resetAll(candidates, false);
-    }
 
     if(numpreserve > preserve_ways){
         CacheBlk *victim_blk = reinterpret_cast<CacheBlk*>(preservedEntry);
@@ -278,15 +200,15 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     //CacheBlk *lruBlk = reinterpret_cast<CacheBlk*>(lruEntry);
     //// If there are no unpreserved entries in Preserve mode, return lru of lru mode
     //if (!lruBlk->isPreserve() && (numNotPreserved==0 ||
-    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             std::static_pointer_cast<TLRUEmissaryReplData>(
     //                             victimNotSt->replacementData)->lastTouchTick >
-    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             std::static_pointer_cast<TLRUEmissaryReplData>(
     //                             lruEntry->replacementData)->lastTouchTick)) {
     //    return lruEntry;
     //} else if (lruBlk->isPreserve() && (numNotPreserved==0 &&
-    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             std::static_pointer_cast<TLRUEmissaryReplData>(
     //                             victim->replacementData)->lastTouchTick >
-    //                             std::static_pointer_cast<LRUEmissaryReplData>(
+    //                             std::static_pointer_cast<TLRUEmissaryReplData>(
     //                             lruEntry->replacementData)->lastTouchTick)) {
     //    return lruEntry;
     //}
@@ -297,19 +219,13 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
 }
 
 std::shared_ptr<ReplacementData>
-LRUEmissary::instantiateEntry()
+TLRUEmissary::instantiateEntry()
 {
-    return std::shared_ptr<ReplacementData>(new LRUEmissaryReplData(NULL));
-}
-
-std::shared_ptr<ReplacementData>
-LRUEmissary::instantiateEntry(CacheBlk *blk)
-{
-    return std::shared_ptr<ReplacementData>(new LRUEmissaryReplData(blk));
+    return std::shared_ptr<ReplacementData>(new TLRUEmissaryReplData());
 }
 
 void 
-LRUEmissary::checkToFlushPreserveBits(){
+TLRUEmissary::checkToFlushPreserveBits(){
 
     if (flush_freq_in_cycles == 0){
         return;
@@ -326,7 +242,7 @@ LRUEmissary::checkToFlushPreserveBits(){
 }
 
 void
-LRUEmissary::dumpPreserveHist(){
+TLRUEmissary::dumpPreserveHist(){
     ofstream histOut; 
     histOut.open(simout.directory()+"/set_hist.csv",fstream::app);
 

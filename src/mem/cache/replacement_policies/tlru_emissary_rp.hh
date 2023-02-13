@@ -32,8 +32,8 @@
  * The victim is chosen using the last touch timestamp.
  */
 
-#ifndef __MEM_CACHE_REPLACEMENT_POLICIES_LRU_EMISSARY_RP_HH__
-#define __MEM_CACHE_REPLACEMENT_POLICIES_LRU_EMISSARY_RP_HH__
+#ifndef __MEM_CACHE_REPLACEMENT_POLICIES_TLRU_EMISSARY_RP_HH__
+#define __MEM_CACHE_REPLACEMENT_POLICIES_TLRU_EMISSARY_RP_HH__
 
 #include "mem/cache/replacement_policies/base.hh"
 #include "mem/cache/base.hh"
@@ -44,31 +44,30 @@
 namespace gem5
 {
 
-struct LRUEmissaryRPParams;
+struct TLRUEmissaryRPParams;
 
 GEM5_DEPRECATED_NAMESPACE(ReplacementPolicy, replacement_policy);
 namespace replacement_policy
 {
 
-class LRUEmissary : public Base
+class TLRUEmissary : public Base
 {
   protected:
-    /** LRUEmissary-specific implementation of replacement data. */
-    struct LRUEmissaryReplData : ReplacementData
+    /** TLRUEmissary-specific implementation of replacement data. */
+    struct TLRUEmissaryReplData : ReplacementData
     {
         /** Tick on which the entry was last touched. */
         Tick lastTouchTick;
-        CacheBlk *blk;
 
         /**
          * Default constructor. Invalidate data.
          */
-        LRUEmissaryReplData(CacheBlk *blk) : lastTouchTick(0), blk(blk) {}
+        TLRUEmissaryReplData() : lastTouchTick(0) {}
     };
 
   public:
     /** Convenience typedef. */
-    typedef LRUEmissaryRPParams Params;
+    typedef TLRUEmissaryRPParams Params;
     int lru_ways;
     int preserve_ways;
     uint64_t last_tick;
@@ -82,12 +81,12 @@ class LRUEmissary : public Base
     /**
      * Construct and initiliaze this replacement policy.
      */
-    LRUEmissary(const Params &p);
+    TLRUEmissary(const Params &p);
 
     /**
      * Destructor.
      */
-    ~LRUEmissary() {}
+    ~TLRUEmissary() {}
 
     /**
      * Invalidate replacement data to set it as the next probable victim.
@@ -115,14 +114,11 @@ class LRUEmissary : public Base
      */
     void reset(const std::shared_ptr<ReplacementData>& replacement_data) const
                                                                      override;
-    void resetAll(const ReplacementCandidates& candidates, bool preservedWays) const;
-
     void starveMRU(const std::shared_ptr<ReplacementData>& replacement_data) const
                                                                      override {}
-    void checkLRU(const std::shared_ptr<ReplacementData>& replacement_data) const;
 
     /**
-     * Find replacement victim using LRUEmissary timestamps.
+     * Find replacement victim using TLRUEmissary timestamps.
      *
      * @param candidates Replacement candidates, selected by indexing policy.
      * @return Replacement entry to be replaced.
@@ -136,7 +132,6 @@ class LRUEmissary : public Base
      * @return A shared pointer to the new replacement data.
      */
     std::shared_ptr<ReplacementData> instantiateEntry() override;
-    std::shared_ptr<ReplacementData> instantiateEntry(CacheBlk *blk); 
 
     void dumpPreserveHist();
     
@@ -146,4 +141,4 @@ class LRUEmissary : public Base
 } // namespace replacement_policy
 } // namespace gem5
 
-#endif // __MEM_CACHE_REPLACEMENT_POLICIES_LRU_EMISSARY_RP_HH__
+#endif // __MEM_CACHE_REPLACEMENT_POLICIES_TLRU_EMISSARY_RP_HH__
