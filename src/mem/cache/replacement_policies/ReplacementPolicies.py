@@ -88,6 +88,7 @@ class LRUEmissaryRP(BaseReplacementPolicy):
     lru_ways = Param.Int(Parent.lru_ways, "Number of ways allocated to LRU Mode")
     preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways allocated to Preserve Mode")
     flush_freq_in_cycles = Param.Unsigned(0,"Frequeny in number of cycles to flush Preserve bits")
+    max_val = Param.Unsigned(32,"Max age value")
 
 class TLRUEmissaryRP(BaseReplacementPolicy):
     type = 'TLRUEmissaryRP'

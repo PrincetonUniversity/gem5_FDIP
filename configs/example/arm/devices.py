@@ -67,7 +67,7 @@ class L1D(L1_DCache):
     write_buffers = 16
     prefetcher = TaggedPrefetcher()
     prefetcher.degree = 1
-    replacement_policy = LRURP()
+    replacement_policy = PLRURP()
 
 
 class WalkCache(PageTableWalkerCache):
@@ -300,9 +300,9 @@ class CpuCluster(SubSystem):
                 elif self._l1i_rp == "PLRU":
                     l1i.replacement_policy = PLRURP()
                 else:
-                    l1i.replacement_policy = LRURP()
+                    l1i.replacement_policy = PLRURP()
             else:
-                l1i.replacement_policy = LRURP()
+                l1i.replacement_policy = PLRURP()
 
             if self._args.opt:
                 l1i.assoc = 256
@@ -321,6 +321,7 @@ class CpuCluster(SubSystem):
         if self._l2_rp == "LRUEmissary":
             self.l2.replacement_policy = LRUEmissaryRP()
             self.l2.lru_ways = 2
+            self.l2.replacement_policy.max_val = 32
             if self._preserve_ways:
                 self.l2.preserve_ways = self._preserve_ways
                 self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
@@ -361,7 +362,7 @@ class CpuCluster(SubSystem):
             self.l2.replacement_policy = PDPRP()
             self.l2.replacement_policy.num_bits = 4
         elif self._l2_rp == "PerfectNoCold":
-            self.l2.replacement_policy = LRURP()
+            self.l2.replacement_policy = PLRURP()
             self.l2.perfect_no_cold = True
 
         if self._args.l2_size:

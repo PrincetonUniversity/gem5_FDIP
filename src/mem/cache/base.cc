@@ -394,6 +394,17 @@ BaseCache::recvTimingStarvationReq(PacketPtr pkt)
 
     if(pkt->req->getAccessDepth() == 1){
         tags->starveMRU(pkt->getAddr(), pkt->isSecure());
+        //if(blk){
+        //    if (pkt->isStarved()){
+        //        //blk->coherence |= CacheBlk::BlkStarved;
+        //        blk->setCoherenceBits(CacheBlk::BlkStarved);
+        //    }
+        //    if (pkt->isPreserve()) { 
+        //        //blk->coherence |= CacheBlk::BlkPreserve;
+        //        blk->setCoherenceBits(CacheBlk::BlkPreserve);
+        //        //blk->starveHistory = 0;
+        //    }
+        //}
 
         delete pkt;
         return true;
@@ -478,6 +489,11 @@ BaseCache::recvTimingReq(PacketPtr pkt)
                 //blk->l1AccessCount = 0;
                 blk->setCoherenceBits(CacheBlk::BlkStarved);
                 blk->setCoherenceBits(CacheBlk::BlkPreserve);
+                auto *set_assoc = dynamic_cast<BaseSetAssoc*>(tags);
+                if(set_assoc){
+                    DPRINTF(Cache, "Touch block at promotion time\n");
+                    set_assoc->replacementPolicy->promote(blk->replacementData);
+                }
             }
             DPRINTF(Cache, "L2 BLK Update: starveHistory for addr %#x is %#x starveCount %d\n", pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0, blk->starveHistory, blk->starveCount);
 	    }

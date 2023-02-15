@@ -108,6 +108,9 @@ class Base : public SimObject
     virtual void starveMRU(const std::shared_ptr<ReplacementData>&
                                                 replacement_data) const { return; };
 
+    virtual void promote(const std::shared_ptr<ReplacementData>&
+        replacement_data) const {};
+
     virtual void reset_inst_line(const std::shared_ptr<ReplacementData>&
         replacement_data, bool is_inst, bool is_sfl) const
     {

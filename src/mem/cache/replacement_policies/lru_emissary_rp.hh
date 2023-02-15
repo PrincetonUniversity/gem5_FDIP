@@ -40,7 +40,7 @@
 #include "mem/cache/tags/base.hh"
 #include "mem/cache/cache_blk.hh"
 #include "mem/cache/tags/indexing_policies/base.hh"
-
+#include "debug/EMISSARY.hh"
 namespace gem5
 {
 
@@ -75,6 +75,7 @@ class LRUEmissary : public Base
     int numSets;
     int numWays;
     uint64_t flush_freq_in_cycles;
+    uint32_t max_age;
 
     /** Indexing policy */
     BaseIndexingPolicy *indexingPolicy;
@@ -129,6 +130,8 @@ class LRUEmissary : public Base
      */
     ReplaceableEntry* getVictim(const ReplacementCandidates& candidates) const
                                                                      override;
+    void promote(const std::shared_ptr<ReplacementData>&
+        replacement_data) const override;
 
     /**
      * Instantiate a replacement data entry.
@@ -141,6 +144,11 @@ class LRUEmissary : public Base
     void dumpPreserveHist();
     
     void checkToFlushPreserveBits();
+    
+    //struct LRUEmissaryStats : public statistics::Group{
+    //    LRUEmissaryStats(LRUEmissary &c, const std::string &name);
+    //
+    //}
 };
 
 } // namespace replacement_policy

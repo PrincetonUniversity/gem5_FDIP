@@ -51,3 +51,4 @@ Source('plru_rp.cc')
 Source('pdp_rp.cc')
 
 DebugFlag('PDP')
+DebugFlag('EMISSARY')

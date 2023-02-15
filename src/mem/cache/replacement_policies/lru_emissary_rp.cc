@@ -37,7 +37,7 @@
 #include "base/trace.hh"
 #include "base/output.hh"
 
-#define MAX_VAL 8
+#define MAX_VAL 32
 
 namespace gem5
 {
@@ -50,7 +50,8 @@ LRUEmissary::LRUEmissary(const Params &p)
     : Base(p), lru_ways(p.lru_ways),
     preserve_ways(p.preserve_ways),
     last_tick(0),
-    flush_freq_in_cycles(p.flush_freq_in_cycles)
+    flush_freq_in_cycles(p.flush_freq_in_cycles),
+    max_age(p.max_val)
 {
         registerExitCallback([this]() { dumpPreserveHist(); });
 }
@@ -63,6 +64,16 @@ LRUEmissary::invalidate(const std::shared_ptr<ReplacementData>& replacement_data
         replacement_data)->lastTouchTick = 0;
 }
 
+void 
+LRUEmissary::promote(const std::shared_ptr<ReplacementData>&
+        replacement_data) const
+{
+    return;
+    checkLRU(replacement_data);
+    std::static_pointer_cast<LRUEmissaryReplData>(
+        replacement_data)->lastTouchTick = max_age; 
+}
+
 void
 LRUEmissary::checkLRU(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
@@ -72,29 +83,33 @@ LRUEmissary::checkLRU(const std::shared_ptr<ReplacementData>& replacement_data) 
     auto set = cur_blk->getSet();
 
     bool preserve = cur_blk->isPreserve();
+
     std::vector<ReplaceableEntry*> entries; 
 
     bool allOnes = true;
-    //DPRINTFN("Age of set %d :", set);
+    DPRINTF(EMISSARY, "Age of set %d :", set);
     for(int way=0; way < numWays; way++){
 
         ReplaceableEntry *entry = indexingPolicy->getEntry(set, way);
         CacheBlk *blk = reinterpret_cast<CacheBlk*>(entry);
         auto candidate_repl_data = std::static_pointer_cast<LRUEmissaryReplData>(blk->replacementData);
-        if(candidate_repl_data->lastTouchTick > 1){
+        if((blk->isPreserve() == preserve) && candidate_repl_data->lastTouchTick > 1){
             candidate_repl_data->lastTouchTick--;
+            entries.push_back(entry);
         }
-        //DPRINTFNR(" %d",candidate_repl_data->lastTouchTick);
-        if(((preserve == blk->isPreserve())) && candidate_repl_data->lastTouchTick == 0){
+        DPRINTFR(EMISSARY, " %d",candidate_repl_data->lastTouchTick);
+        if(blk->isPreserve()){
+            DPRINTFR(EMISSARY, "(P)");
+        }
+        if(((preserve == blk->isPreserve())) && candidate_repl_data->lastTouchTick == 1){
             allOnes = false;
         }
-        entries.push_back(entry);
     }
-    //DPRINTFNR("\n");
+    DPRINTFR(EMISSARY, "\n");
 
     //if(allOnes){
     //    resetAll(entries, preserve);
-    //    //DPRINTFN("All Ones set %d when updating way %d preserved %d\n", set, cur_blk->getWay(), preserve);
+    //    DPRINTF(EMISSARY, "All Ones set %d when updating way %d preserved %d\n", set, cur_blk->getWay(), preserve);
     //}
  
 }
@@ -105,6 +120,12 @@ LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) con
     auto *non_const_this = const_cast<LRUEmissary*>(this);
     non_const_this->checkToFlushPreserveBits();
 
+    auto repl_data = static_pointer_cast<LRUEmissaryReplData>(replacement_data);
+    CacheBlk *cur_blk = repl_data->blk;
+    bool preserve = cur_blk->isPreserve();
+
+    //if(preserve)
+    //    return;
 
     // Update last touch timestamp
     //std::static_pointer_cast<LRUEmissaryReplData>(
@@ -113,7 +134,7 @@ LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) con
     checkLRU(replacement_data);
 
     std::static_pointer_cast<LRUEmissaryReplData>(
-        replacement_data)->lastTouchTick = MAX_VAL;
+        replacement_data)->lastTouchTick = max_age; 
 
 }
 
@@ -127,7 +148,7 @@ LRUEmissary::reset(const std::shared_ptr<ReplacementData>& replacement_data) con
     checkLRU(replacement_data);
     // Set last touch timestamp
     std::static_pointer_cast<LRUEmissaryReplData>(
-        replacement_data)->lastTouchTick = MAX_VAL; 
+        replacement_data)->lastTouchTick = max_age; 
         //replacement_data)->lastTouchTick = curTick();
 }
 
@@ -169,6 +190,10 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
     // Find the LRU line among ones in LRU Mode
     for (const auto& candidate : candidates) {
         CacheBlk *blk = reinterpret_cast<CacheBlk*>(candidate);
+
+        if(std::static_pointer_cast<LRUEmissaryReplData>(candidate->replacementData)->lastTouchTick == 0){
+            return candidate;
+        }
 
         if(blk->isPreserve()){
             numpreserve++;
@@ -270,8 +295,8 @@ LRUEmissary::getVictim(const ReplacementCandidates& candidates) const
         //DPRINTFN("EMISSARY: preservedEntry: %s\n",victim_blk->print());
         CacheBlk *lru_blk = reinterpret_cast<CacheBlk*>(lruEntry);
         //DPRINTFN("EMISSARY: lruEntry: %s\n",lru_blk->print());
-        //return preservedEntry;
-        return lruEntry;
+        return preservedEntry;
+        //return lruEntry;
     }else{
         return victimNotSt;
     }
