@@ -2716,7 +2716,7 @@ Fetch::addToFTQ()
         return;
     }
     //assert(prefPC[tid].instAddr() != 0 && "prefPC cannot be 0\n");
-    preDecodeAllLines();
+    //preDecodeAllLines();
     //preDecode();
     // The current Prefetch PC.
     TheISA::PCState thisPC = prefPC[tid];

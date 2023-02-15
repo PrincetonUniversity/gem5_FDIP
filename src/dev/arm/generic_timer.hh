@@ -210,8 +210,10 @@ class ArchTimer : public SystemCounterListener, public Drainable,
      */
     void updateCounter();
 
+  public:
     /// Called when the upcounter reaches the programmed value.
     void counterLimitReached();
+  protected:
     EventFunctionWrapper _counterLimitReachedEvent;
 
     virtual bool scheduleEvents() { return true; }
@@ -299,7 +301,7 @@ class GenericTimer : public SimObject
     void setMiscReg(int misc_reg, unsigned cpu, RegVal val);
     RegVal readMiscReg(int misc_reg, unsigned cpu);
 
-  protected:
+  public:
     class CoreTimers : public SystemCounterListener, public Serializable
     {
       public:

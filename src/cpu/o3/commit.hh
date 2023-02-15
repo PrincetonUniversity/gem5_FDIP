@@ -497,6 +497,8 @@ class Commit
     uint64_t prevCommCycle;
     uint64_t instCount;
     Addr prevLine;
+    uint64_t timerWindow;
+    uint64_t lastTimerInst;
 
     struct CommitStats : public statistics::Group
     {

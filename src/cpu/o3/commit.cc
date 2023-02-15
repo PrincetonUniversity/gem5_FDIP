@@ -72,6 +72,7 @@
 #include "debug/MispredCommTrace.hh"
 #include "sim/pseudo_inst.hh"
 #include "debug/StarvationCounts.hh"
+#include "dev/arm/generic_timer.hh"
 
 namespace gem5
 {
@@ -116,6 +117,8 @@ Commit::Commit(CPU *_cpu, const O3CPUParams &params)
       prevCommCycle(0),
       instCount(1),
       prevLine(0),
+      timerWindow(params.timerWindow),
+      lastTimerInst(0),
       stats(_cpu, this)
 {
     if (commitWidth > MaxWidth)
@@ -853,6 +856,22 @@ void
 Commit::commit()
 {
     if (FullSystem) {
+#if THE_ISA == ARM_ISA
+        //Check numInsts committed and if it is multiple of 10M then
+        //raise timer interrupt
+        
+        if( instCount - lastTimerInst >= timerWindow){
+            
+            lastTimerInst = (instCount - (instCount % timerWindow));
+            DPRINTF(Commit, "Timer interrupt at cont: %llu\n", instCount);
+
+            //Raise Timer interrupt here
+            //dynamic_cast<X86ISA::Interrupts *>(cpu->interrupts[0])->triggerTimerInterrupt();
+            //auto *ARMSys = dynamic_cast<gem5::ArmSystem *>(cpu->system);
+            //ARMSys->getGenericTimer()->getTimers(0).virt.counterLimitReached();
+        }
+#endif
+
         // Check if we have a interrupt and get read to handle it
         if (cpu->checkInterrupts(0))
             propagateInterrupt();
@@ -1060,6 +1079,10 @@ Commit::commitInsts()
 
         ThreadID commit_thread = getCommittingThread();
 
+        if( instCount - lastTimerInst >= timerWindow){
+            break;
+        }
+        
         // Check for any interrupt that we've already squashed for
         // and start processing it.
         if (interrupt != NoFault) {

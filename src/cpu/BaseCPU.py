@@ -198,6 +198,7 @@ class BaseCPU(ClockedObject):
                                        "starvation count limit for Oracle EMISSARY policy")
     # EMISSARY: END
 
+    timerWindow = Param.Unsigned(10000000, "Number committed instructions between timer interrupts")
     icache_port = RequestPort("Instruction Port")
     dcache_port = RequestPort("Data Port")
     _cached_ports = ['icache_port', 'dcache_port']

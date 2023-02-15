@@ -61,6 +61,7 @@
 #include "sim/process.hh"
 #include "sim/stat_control.hh"
 #include "sim/system.hh"
+#include "dev/arm/generic_timer.hh"
 
 namespace gem5
 {
@@ -611,6 +612,10 @@ CPU::activateThread(ThreadID tid)
 void
 CPU::deactivateThread(ThreadID tid)
 {
+#if THE_ISA == ARM_ISA
+    //auto *ARMSys = dynamic_cast<gem5::ArmSystem *>(system);
+    //ARMSys->getGenericTimer()->getTimers(0).virt.counterLimitReached();
+#endif
     DPRINTFN("deactivating\n");
     // hardware transactional memory
     // shouldn't deactivate thread in the middle of a transaction
