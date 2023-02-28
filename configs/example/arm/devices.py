@@ -67,7 +67,7 @@ class L1D(L1_DCache):
     write_buffers = 16
     prefetcher = TaggedPrefetcher()
     prefetcher.degree = 1
-    replacement_policy = PLRURP()
+    replacement_policy = TreePLRURP()
 
 
 class WalkCache(PageTableWalkerCache):
@@ -283,6 +283,16 @@ class CpuCluster(SubSystem):
                         l1i.lru_ways = 8 - int(self._preserve_ways)
                     else:
                         l1i.preserve_ways = 6
+                elif self._l1i_rp == "TreeLRUEmissary":
+                    l1i.replacement_policy = TreeLRUEmissaryRP()
+                    l1i.lru_ways = 2
+                    if self._args.hist_freq_cycles:
+                        l1i.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
+                    if self._preserve_ways:
+                        l1i.preserve_ways = self._preserve_ways
+                        l1i.lru_ways = 8 - int(self._preserve_ways)
+                    else:
+                        l1i.preserve_ways = 6
                 elif self._l1i_rp == "OPT":
                     l1i.replacement_policy = OPTRP()
                     l1i.assoc = 256
@@ -299,10 +309,12 @@ class CpuCluster(SubSystem):
                     l1i.replacement_policy = MLPLINRP()
                 elif self._l1i_rp == "PLRU":
                     l1i.replacement_policy = PLRURP()
+                elif self._l1i_rp == "TreePLRU":
+                    l1i.replacement_policy = TreePLRURP()
                 else:
-                    l1i.replacement_policy = PLRURP()
+                    l1i.replacement_policy = TreePLRURP()
             else:
-                l1i.replacement_policy = PLRURP()
+                l1i.replacement_policy = TreePLRURP()
 
             if self._args.opt:
                 l1i.assoc = 256
@@ -322,6 +334,19 @@ class CpuCluster(SubSystem):
             self.l2.replacement_policy = LRUEmissaryRP()
             self.l2.lru_ways = 2
             self.l2.replacement_policy.max_val = 32
+            if self._preserve_ways:
+                self.l2.preserve_ways = self._preserve_ways
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+            else:
+                self.l2.preserve_ways = 6
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+
+            if self._args.hist_freq_cycles:
+                self.l2.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
+
+        elif self._l2_rp == "TreeLRUEmissary":
+            self.l2.replacement_policy = TreeLRUEmissaryRP()
+            self.l2.lru_ways = 2
             if self._preserve_ways:
                 self.l2.preserve_ways = self._preserve_ways
                 self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
@@ -358,11 +383,13 @@ class CpuCluster(SubSystem):
             #self.l2.replacement_policy.btp = 3 # self.btp
         elif self._l2_rp == "PLRU":
             self.l2.replacement_policy = PLRURP()
+        elif self._l2_rp == "TreePLRU":
+            self.l2.replacement_policy = TreePLRURP()
         elif self._l2_rp == "PDP":
             self.l2.replacement_policy = PDPRP()
             self.l2.replacement_policy.num_bits = 4
         elif self._l2_rp == "PerfectNoCold":
-            self.l2.replacement_policy = PLRURP()
+            self.l2.replacement_policy = TreePLRURP()
             self.l2.perfect_no_cold = True
 
         if self._args.l2_size:

@@ -81,6 +81,16 @@ class OPTRP(BaseReplacementPolicy):
     cxx_class = 'gem5::replacement_policy::OPT'
     cxx_header = "mem/cache/replacement_policies/opt_rp.hh"
 
+class TreeLRUEmissaryRP(BaseReplacementPolicy):
+    type = 'TreeLRUEmissaryRP'
+    cxx_class = 'gem5::replacement_policy::TreeLRUEmissary'
+    cxx_header = "mem/cache/replacement_policies/tree_lru_emissary_rp.hh"
+    lru_ways = Param.Int(Parent.lru_ways, "Number of ways allocated to LRU Mode")
+    preserve_ways = Param.Int(Parent.preserve_ways, "Number of ways allocated to Preserve Mode")
+    flush_freq_in_cycles = Param.Unsigned(0,"Frequeny in number of cycles to flush Preserve bits")
+    max_val = Param.Unsigned(32,"Max age value")
+    num_leaves = Param.Int(Parent.assoc, "Number of leaves in each tree")
+
 class LRUEmissaryRP(BaseReplacementPolicy):
     type = 'LRUEmissaryRP'
     cxx_class = 'gem5::replacement_policy::LRUEmissary'

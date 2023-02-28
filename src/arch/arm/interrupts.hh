@@ -193,6 +193,7 @@ class Interrupts : public BaseInterrupts
         virtWake |= (hcr.vf || interrupts[INT_VIRT_FIQ]) && hcr.fmo;
         virtWake |=  hcr.va                              && hcr.amo;
         virtWake &= (cpsr.mode != MODE_HYP) && !isSecure(tc);
+        DPRINTF(Interrupt, "checkWfiWake %d\n", maskedIntStatus || virtWake);
         return maskedIntStatus || virtWake;
     }
 
