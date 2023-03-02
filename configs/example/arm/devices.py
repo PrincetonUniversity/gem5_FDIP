@@ -96,7 +96,7 @@ class L2(L2Cache):
 
 
 class L3(Cache):
-    size = '8MB'
+    size = '2MB'
     assoc = 16
     tag_latency = 20
     data_latency = 20
@@ -333,7 +333,7 @@ class CpuCluster(SubSystem):
         if self._l2_rp == "LRUEmissary":
             self.l2.replacement_policy = LRUEmissaryRP()
             self.l2.lru_ways = 2
-            self.l2.replacement_policy.max_val = 32
+            self.l2.replacement_policy.max_val = 8
             if self._preserve_ways:
                 self.l2.preserve_ways = self._preserve_ways
                 self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)

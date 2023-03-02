@@ -69,7 +69,10 @@ LRUEmissary::promote(const std::shared_ptr<ReplacementData>&
         replacement_data) const
 {
     return;
-    checkLRU(replacement_data);
+    if(std::static_pointer_cast<LRUEmissaryReplData>(
+                           replacement_data)->lastTouchTick != 0){
+        checkLRU(replacement_data);
+    }
     std::static_pointer_cast<LRUEmissaryReplData>(
         replacement_data)->lastTouchTick = max_age; 
 }
@@ -131,7 +134,7 @@ LRUEmissary::touch(const std::shared_ptr<ReplacementData>& replacement_data) con
     //std::static_pointer_cast<LRUEmissaryReplData>(
     //    replacement_data)->lastTouchTick = Tick(500);
     //    //replacement_data)->lastTouchTick = curTick();
-    checkLRU(replacement_data);
+    //checkLRU(replacement_data);
 
     std::static_pointer_cast<LRUEmissaryReplData>(
         replacement_data)->lastTouchTick = max_age; 
