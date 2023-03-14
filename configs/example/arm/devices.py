@@ -357,6 +357,19 @@ class CpuCluster(SubSystem):
             if self._args.hist_freq_cycles:
                 self.l2.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
 
+        elif self._l2_rp == "OneTreeLRUEmissary":
+            self.l2.replacement_policy = OneTreeLRUEmissaryRP()
+            self.l2.lru_ways = 2
+            if self._preserve_ways:
+                self.l2.preserve_ways = self._preserve_ways
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+            else:
+                self.l2.preserve_ways = 6
+                self.l2.lru_ways = self.l2.assoc - int(self._preserve_ways)
+
+            if self._args.hist_freq_cycles:
+                self.l2.replacement_policy.flush_freq_in_cycles = self._args.hist_freq_cycles
+
         elif self._l2_rp == "LIP":
             self.l2.replacement_policy = LIPRP()
         elif self._l2_rp == "MLP":
@@ -626,6 +639,8 @@ class BaseSimpleSystem(ArmSystem):
 
             if cluster._args.l3_rp == "SFL":
                 self.l3.replacement_policy = SFLRP()
+                self.l3.replacement_policy.replacement_policy_a.num_bits = cluster._args.l3_rrpv_bits
+                self.l3.replacement_policy.replacement_policy_b.num_bits = cluster._args.l3_rrpv_bits
             elif cluster._args.l3_rp == "DRRIP":
                 self.l3.replacement_policy = DRRIPRP()
                 self.l3.replacement_policy.team_size = 16
@@ -635,6 +650,8 @@ class BaseSimpleSystem(ArmSystem):
             elif cluster._args.l3_rp == "BRRIP":
                 self.l3.replacement_policy = BRRIPRP()
                 self.l3.replacement_policy.btp = 3 # self.btp
+            elif cluster._args.l3_rp == "TreePLRU":
+                self.l3.replacement_policy = TreePLRURP()
 
         # connect each cluster to the memory hierarchy
         for cluster in self._clusters:

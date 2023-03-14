@@ -378,7 +378,6 @@ LRUEmissary::dumpPreserveHist(){
             }
 
             if(!blk->isUsed()){
-                DPRINTFN("Used line\n");
                 blk->clearPreserve();
                 //Erase preserve bit here
             }

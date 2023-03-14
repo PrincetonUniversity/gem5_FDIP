@@ -171,6 +171,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--oracleEMISSARY", action="store_true", default=False)
     parser.add_argument("--oracleStarvationsFileName", type=str, default="")
     parser.add_argument("--oracleStarvationCountThreshold", type=int, default=100)
+    parser.add_argument("--l3_rrpv_bits", type=int, default=2)
     parser.add_argument("--fetchQSize", type=int, default=32)
     parser.add_argument("--ftqSize", type=int, default=0)
     parser.add_argument("--ftqInst", type=int, default=192)

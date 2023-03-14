@@ -66,6 +66,7 @@
 #include "mem/cache/replacement_policies/lru_emissary_rp.hh"
 #include "mem/cache/replacement_policies/tlru_emissary_rp.hh"
 #include "mem/cache/replacement_policies/tree_lru_emissary_rp.hh"
+#include "mem/cache/replacement_policies/one_tree_lru_emissary_rp.hh"
 
 namespace gem5
 {

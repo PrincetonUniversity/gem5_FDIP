@@ -77,7 +77,7 @@ class BRRIP : public Base
          * max_RRPV-1 -> long re-rereference interval
          * max_RRPV -> distant re-rereference interval
          */
-        SatCounter8 rrpv;
+        SatCounter32 rrpv;
 
         /** Whether the entry is valid. */
         bool valid;
