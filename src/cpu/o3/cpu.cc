@@ -512,6 +512,7 @@ CPU::tick()
 
     ++baseStats.numCycles;
     updateCycleCounters(BaseCPU::CPU_STATE_ON);
+    lastRunningCycle = curCycle();
 
 //    activity = false;
 
@@ -1618,7 +1619,7 @@ CPU::wakeCPU()
         baseStats.numCycles += cycles;
     }
 
-    schedule(tickEvent, clockEdge());
+    schedule(tickEvent, clockEdge(Cycles(1)));
 }
 
 void
